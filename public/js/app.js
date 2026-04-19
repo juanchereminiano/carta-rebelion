@@ -138,8 +138,9 @@ const CHART_DEFAULTS = {
   scaleY: { grid: { color: '#2a2d3a' }, ticks: { color: '#7b7f94' } },
 };
 
-const CLASE_COLOR  = { A: '#38d9a9', B: '#f5a623', C: '#e03c5a' };
-const CAT_PALETTE  = ['#e03c5a','#f5a623','#7ed321','#4fc3f7','#ce93d8','#80cbc4','#ffb74d','#a5d6a7','#f48fb1','#90caf9'];
+// Paleta Rebelión
+const CLASE_COLOR  = { A: '#4a9eff', B: '#c8a84b', C: '#5a7fa8' };  // azul / dorado / azul apagado
+const CAT_PALETTE  = ['#2b5ead','#4a9eff','#c8a84b','#3b8a6e','#6e4fa8','#2d7d9a','#b87333','#4a7c59','#7a5c8a','#2a6496','#8a6a2a','#3d6b8a'];
 
 // ── DASHBOARD ──────────────────────────────────────────────────────────────
 
@@ -187,7 +188,7 @@ function renderPareto(pareto) {
         {
           type: 'line', label: '% Acumulado',
           data: items.map(i => i.pctCum),
-          borderColor: '#90caf9', backgroundColor: 'transparent',
+          borderColor: '#c8a84b', backgroundColor: 'transparent',
           borderWidth: 2, pointRadius: 3, tension: 0.3, yAxisID: 'yLine', order: 1,
         },
       ],
@@ -286,7 +287,7 @@ function renderEvolucion(evo) {
       datasets: [{
         label: isV ? 'Ventas $' : 'Cantidad',
         data: isV ? evo.ventas : evo.cantidad,
-        borderColor: '#e03c5a', backgroundColor: '#e03c5a18',
+        borderColor: '#4a9eff', backgroundColor: '#2b5ead18',
         borderWidth: 2.5, tension: 0.35, pointRadius: 4, fill: true,
       }],
     },
@@ -334,8 +335,8 @@ function renderEvolucionCat(data) {
       datasets: [{
         label: isV ? 'Total ventas' : 'Total unidades',
         data: isV ? evo.ventas : evo.cantidad,
-        backgroundColor: '#e03c5a88',
-        borderColor: '#e03c5a',
+        backgroundColor: '#2b5ead88',
+        borderColor: '#4a9eff',
         borderWidth: 1,
         borderRadius: 3,
       }],
@@ -482,10 +483,10 @@ document.getElementById('filter-cat').addEventListener('change',   e => { state.
 // ── MATRIZ BCG ─────────────────────────────────────────────────────────────
 
 const BCG_CONFIG = {
-  Estrella:     { color: '#38d9a9', icon: '★', desc: 'Alta participación + crecimiento. Potenciar.' },
-  Vaca:         { color: '#4fc3f7', icon: '◆', desc: 'Alta participación + estable/baja. Mantener.' },
-  Interrogante: { color: '#f5a623', icon: '?', desc: 'Baja participación + crecimiento. Decidir.' },
-  Perro:        { color: '#e03c5a', icon: '✕', desc: 'Baja participación + declive. Revisar.' },
+  Estrella:     { color: '#4a9eff', icon: '★', desc: 'Alta participación + crecimiento. Potenciar.' },
+  Vaca:         { color: '#c8a84b', icon: '◆', desc: 'Alta participación + estable/baja. Mantener.' },
+  Interrogante: { color: '#6e8faf', icon: '?', desc: 'Baja participación + crecimiento. Decidir.' },
+  Perro:        { color: '#3d5a78', icon: '✕', desc: 'Baja participación + declive. Revisar.' },
 };
 
 function buildBCG(data) {
