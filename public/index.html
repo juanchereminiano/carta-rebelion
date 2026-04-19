@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Carta Rebelión — Análisis</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <span class="logo-mark">R</span>
+      <span>Carta Rebelión</span>
+    </div>
+    <div class="header-controls">
+      <span id="last-update" class="last-update"></span>
+      <button id="btn-refresh" class="btn-refresh" title="Actualizar datos">&#8635;</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- Filtros ------------------------------------------------------------------>
+  <section class="filters-bar card">
+    <div class="filters-inner">
+      <div class="filter-group">
+        <label class="filter-label">Año</label>
+        <div id="filter-ano" class="filter-chips">
+          <button class="chip active" data-value="all">Todos</button>
+        </div>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">Métrica</label>
+        <div class="filter-chips">
+          <button class="chip active" data-metric="ventas" id="metric-ventas">$ Ventas</button>
+          <button class="chip" data-metric="cantidad" id="metric-cantidad">Cantidad</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- KPIs resumen ------------------------------------------------------------>
+  <section id="summary-grid" class="summary-grid">
+    <div class="summary-card skeleton-card"><div class="skeleton" style="height:80px"></div></div>
+    <div class="summary-card skeleton-card"><div class="skeleton" style="height:80px"></div></div>
+    <div class="summary-card skeleton-card"><div class="skeleton" style="height:80px"></div></div>
+    <div class="summary-card skeleton-card"><div class="skeleton" style="height:80px"></div></div>
+  </section>
+
+  <!-- Pareto + Donut ─────────────────────────────────────────────────────────-->
+  <div class="two-col">
+
+    <section class="card">
+      <div class="card-header-row">
+        <h2>Pareto 80/20 — Top 20 items</h2>
+        <div class="abc-legend">
+          <span class="abc-badge a">A</span> Top 70%
+          <span class="abc-badge b">B</span> 70–90%
+          <span class="abc-badge c">C</span> Cola
+        </div>
+      </div>
+      <div class="chart-wrap chart-pareto">
+        <canvas id="chart-pareto"></canvas>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Distribución por categoría</h2>
+      <div class="donut-wrap">
+        <canvas id="chart-donut"></canvas>
+      </div>
+      <div id="cat-legend" class="cat-legend"></div>
+    </section>
+
+  </div>
+
+  <!-- ABC cards ──────────────────────────────────────────────────────────────-->
+  <section id="abc-cards" class="abc-summary-grid"></section>
+
+  <!-- Evolución mensual ──────────────────────────────────────────────────────-->
+  <section class="card">
+    <h2>Evolución mensual</h2>
+    <div class="chart-wrap">
+      <canvas id="chart-evolucion"></canvas>
+    </div>
+  </section>
+
+  <!-- Tabla completa ─────────────────────────────────────────────────────────-->
+  <section class="card">
+    <div class="card-header-row">
+      <h2>Todos los items</h2>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input id="search-item" class="search-input" type="text" placeholder="Buscar item..." />
+        <select id="filter-clase" class="select-input">
+          <option value="all">Todas las clases</option>
+          <option value="A">Clase A</option>
+          <option value="B">Clase B</option>
+          <option value="C">Clase C</option>
+        </select>
+        <select id="filter-cat" class="select-input">
+          <option value="all">Todas las categorías</option>
+        </select>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="items-table" class="metrics-table items-table">
+        <thead>
+          <tr>
+            <th class="sortable" data-col="rank">#</th>
+            <th class="sortable" data-col="producto">Producto</th>
+            <th>Categoría</th>
+            <th class="sortable" data-col="ventas">Ventas $</th>
+            <th class="sortable" data-col="cantidad">Cant.</th>
+            <th class="sortable" data-col="precioPromedio">Precio prom.</th>
+            <th class="sortable" data-col="pct">% total</th>
+            <th class="sortable" data-col="pctCum">% acum.</th>
+            <th>Clase</th>
+          </tr>
+        </thead>
+        <tbody id="items-tbody">
+          <tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted)">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<div id="toast" class="toast" role="alert" aria-live="polite"></div>
+
+<script src="/js/app.js"></script>
+</body>
+</html>
