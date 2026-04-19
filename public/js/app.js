@@ -128,14 +128,14 @@ function upsertChart(id, config) {
 
 const CHART_DEFAULTS = {
   tooltip: {
-    backgroundColor: '#1a1d27', borderColor: '#2a2d3a', borderWidth: 1,
-    titleColor: '#e8eaf0', bodyColor: '#7b7f94',
+    backgroundColor: '#1a1a1a', borderColor: '#e0dbd2', borderWidth: 1,
+    titleColor: '#ffffff', bodyColor: '#cccccc',
   },
   legend: (pos='bottom') => ({
-    position: pos, labels: { color: '#7b7f94', boxWidth: 12, padding: 14 },
+    position: pos, labels: { color: '#7a7060', boxWidth: 12, padding: 14 },
   }),
-  scaleX: { grid: { color: '#2a2d3a' }, ticks: { color: '#7b7f94', maxRotation: 45, font: { size: 11 } } },
-  scaleY: { grid: { color: '#2a2d3a' }, ticks: { color: '#7b7f94' } },
+  scaleX: { grid: { color: '#e8e3db' }, ticks: { color: '#7a7060', maxRotation: 45, font: { size: 11 } } },
+  scaleY: { grid: { color: '#e8e3db' }, ticks: { color: '#7a7060' } },
 };
 
 // Paleta Rebelión
