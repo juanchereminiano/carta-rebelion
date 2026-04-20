@@ -17,7 +17,7 @@ const {
 } = require('./src/cartaTransform');
 
 const app   = express();
-const cache = new NodeCache({ stdTTL: parseInt(process.env.CACHE_TTL) || 300 });
+const cache = new NodeCache({ stdTTL: parseInt(process.env.CACHE_TTL) || 60 });
 
 app.use(cors());
 app.use(express.static('public'));

@@ -181,15 +181,28 @@ body {
   color: var(--text); font-weight: 600;
 }
 
-.btn-refresh {
-  width: 32px; height: 32px; border-radius: 6px;
-  background: var(--border); border: none; color: var(--text);
-  font-size: 1rem; cursor: pointer; display: grid; place-items: center;
-  transition: background 0.15s;
+.refresh-wrap {
+  display: flex; align-items: center; gap: 6px;
 }
-.btn-refresh:hover { background: #3a3d4a; }
-.btn-refresh.spinning { animation: spin 0.8s linear infinite; }
+.btn-refresh {
+  display: flex; align-items: center; gap: 5px;
+  height: 32px; padding: 0 12px; border-radius: 20px;
+  background: var(--accent); border: none; color: #fff;
+  font-size: 0.78rem; font-weight: 600; cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  white-space: nowrap;
+}
+.btn-refresh:hover { background: var(--accent-hi); }
+.btn-refresh:active { opacity: 0.8; }
+.refresh-icon { font-size: 1rem; line-height: 1; display: inline-block; }
+.btn-refresh.spinning .refresh-icon { animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+.refresh-status {
+  font-size: 0.7rem; color: var(--muted); white-space: nowrap;
+}
+.refresh-status.ok   { color: #28a67e; }
+.refresh-status.live { color: var(--accent); font-weight: 600; }
 
 /* ── Main content ────────────────────────────────────────────────────────── */
 .app-main {
@@ -552,5 +565,8 @@ body {
   .topbar-right .filter-chips { display: none; }
   .topbar-right .ms-wrap { display: none; }
   .seg-hint { display: none; }
+  .refresh-label { display: none; }
+  .refresh-status { display: none; }
+  .btn-refresh { padding: 0 10px; border-radius: 50%; width: 34px; height: 34px; justify-content: center; }
   .s-value { font-size: 1.3rem; }
 }

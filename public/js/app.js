@@ -166,11 +166,54 @@ const fmt = {
   growth:    n => n == null ? '—' : (n >= 0 ? '+' : '')+n.toFixed(1)+'%',
 };
 
-function showToast(msg) {
+function showToast(msg, duration = 3000) {
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 3000);
+  setTimeout(() => el.classList.remove('show'), duration);
+}
+
+// ── Refresh status indicator ───────────────────────────────────────────────
+let _lastFetch    = null;   // timestamp de la última carga exitosa
+let _statusTimer  = null;   // interval que actualiza "hace X seg"
+let _autoRefresh  = null;   // interval del auto-refresh de 60s
+let _autoCountdown = 60;    // segundos restantes para el próximo auto-refresh
+
+function setRefreshStatus(state) {
+  const el = document.getElementById('refresh-status');
+  if (!el) return;
+  el.className = 'refresh-status';
+  if (state === 'loading') {
+    el.textContent = 'Actualizando…';
+  } else if (state === 'ok') {
+    _lastFetch = Date.now();
+    _autoCountdown = 60;
+    el.classList.add('ok');
+    _startStatusTick();
+  } else if (state === 'error') {
+    el.textContent = 'Error al cargar';
+  }
+}
+
+function _startStatusTick() {
+  if (_statusTimer) clearInterval(_statusTimer);
+  _statusTimer = setInterval(() => {
+    const el = document.getElementById('refresh-status');
+    if (!el || !_lastFetch) return;
+    const secsAgo = Math.round((Date.now() - _lastFetch) / 1000);
+    _autoCountdown = Math.max(0, 60 - secsAgo);
+    el.className = 'refresh-status ok';
+    el.textContent = secsAgo < 5
+      ? '✓ Actualizado'
+      : `Actualizado hace ${secsAgo}s · próximo en ${_autoCountdown}s`;
+  }, 1000);
+}
+
+function _startAutoRefresh() {
+  if (_autoRefresh) clearInterval(_autoRefresh);
+  _autoRefresh = setInterval(() => {
+    loadData();   // el servidor tiene cache de 60s; este ciclo coincide con eso
+  }, 60_000);
 }
 
 // ── Sidebar navigation ─────────────────────────────────────────────────────
@@ -1091,9 +1134,16 @@ function renderAll(data) {
 
 // ── Carga de datos ─────────────────────────────────────────────────────────
 
-async function loadData() {
-  document.getElementById('btn-refresh').classList.add('spinning');
+async function loadData({ forceFlush = false } = {}) {
+  const btn = document.getElementById('btn-refresh');
+  btn.classList.add('spinning');
+  setRefreshStatus('loading');
   try {
+    if (forceFlush) {
+      await fetch('/api/refresh', { method: 'POST' });
+      state._catalogReady = false;
+    }
+
     const params = new URLSearchParams({ metric: state.metric });
     if (!state.anos.includes('all'))       params.set('anos',       state.anos.join(','));
     if (!state.meses.includes('all'))      params.set('meses',      state.meses.join(','));
@@ -1103,19 +1153,19 @@ async function loadData() {
     const data = await fetch(`/api/carta?${params}`).then(r => r.json());
     if (data.error) throw new Error(data.error);
     renderAll(data);
+    setRefreshStatus('ok');
   } catch (err) {
     console.error(err);
-    showToast('Error: ' + err.message);
+    setRefreshStatus('error');
+    showToast('Error al cargar datos: ' + err.message);
   } finally {
-    document.getElementById('btn-refresh').classList.remove('spinning');
+    btn.classList.remove('spinning');
   }
 }
 
-document.getElementById('btn-refresh').addEventListener('click', async () => {
-  await fetch('/api/refresh', { method: 'POST' });
-  showToast('Recargando datos...');
-  state._catalogReady = false;
-  loadData();
+document.getElementById('btn-refresh').addEventListener('click', () => {
+  showToast('Forzando actualización desde Google Sheets…', 2000);
+  loadData({ forceFlush: true });
 });
 
 // Cuando el usuario navega a Seguimiento, recargar si hay productos
@@ -1129,4 +1179,5 @@ document.querySelectorAll('.nav-item').forEach(item => {
 initFilters();
 renderSegChips();
 initSegSearch();
+_startAutoRefresh();   // auto-refresh cada 60s
 loadData();

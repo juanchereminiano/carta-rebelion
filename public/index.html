@@ -78,7 +78,13 @@
         <button class="chip active" id="metric-ventas"   data-metric="ventas">$ Ventas</button>
         <button class="chip"        id="metric-cantidad" data-metric="cantidad">Cantidades</button>
       </div>
-      <button id="btn-refresh" class="btn-refresh" title="Actualizar">&#8635;</button>
+      <div class="refresh-wrap">
+        <button id="btn-refresh" class="btn-refresh" title="Forzar actualización desde Google Sheets">
+          <span class="refresh-icon">&#8635;</span>
+          <span class="refresh-label">Actualizar</span>
+        </button>
+        <span id="refresh-status" class="refresh-status"></span>
+      </div>
     </div>
   </header>
 

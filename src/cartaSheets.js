@@ -39,6 +39,57 @@ function normalize(str) {
   return (str || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
+// Meses canónicos y sus variantes/typos conocidos
+const MES_CANONICAL = [
+  'ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO',
+  'JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE',
+];
+// Tabla de aliases para typos frecuentes
+const MES_ALIASES = {
+  FEBERERO: 'FEBRERO', FERBERO: 'FEBRERO', FEBREO: 'FEBRERO', FEBERO: 'FEBRERO',
+  FEBRRERO: 'FEBRERO', FEBREERO: 'FEBRERO', FEBREO: 'FEBRERO',
+  SETIEMBRE: 'SEPTIEMBRE', SEPTEMEBRE: 'SEPTIEMBRE', SEPTIEMPRE: 'SEPTIEMBRE',
+  OCUTBRE: 'OCTUBRE', OCUBRE: 'OCTUBRE',
+  NOVIEMBRE: 'NOVIEMBRE', DICIEMPRE: 'DICIEMBRE', DICIEMRE: 'DICIEMBRE',
+  AGOSTOS: 'AGOSTO', AGOSO: 'AGOSTO',
+};
+
+function normalizeMes(raw) {
+  if (!raw) return '';
+  const upper = raw.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  // 1. Coincidencia exacta
+  if (MES_CANONICAL.includes(upper)) return upper;
+
+  // 2. Alias conocidos
+  if (MES_ALIASES[upper]) return MES_ALIASES[upper];
+
+  // 3. Prefijo de 3+ letras — el más robusto para typos
+  const prefix3 = upper.slice(0, 3);
+  const byPrefix = MES_CANONICAL.find(m => m.startsWith(prefix3));
+  if (byPrefix) return byPrefix;
+
+  // 4. Levenshtein simple — para errores de dedo más graves
+  let bestMes = '', bestDist = Infinity;
+  for (const mes of MES_CANONICAL) {
+    const dist = levenshtein(upper, mes);
+    if (dist < bestDist) { bestDist = dist; bestMes = mes; }
+  }
+  // Aceptar solo si la distancia es razonable (≤ 3 caracteres de diferencia)
+  if (bestDist <= 3) return bestMes;
+
+  return upper; // devolver tal cual si no hay match
+}
+
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, (_, i) => Array.from({ length: n + 1 }, (_, j) => i === 0 ? j : j === 0 ? i : 0));
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+  return dp[m][n];
+}
+
 function parseRows(rows) {
   // Buscar fila de encabezados (contiene "año" o "ano")
   let headerIdx = -1;
@@ -70,7 +121,7 @@ function parseRows(rows) {
     if (!row[idxAno] && !row[idxProd]) continue; // fila vacía
 
     const ano      = parseValue(row[idxAno] || '');
-    const mes      = (row[idxMes] || '').trim().toUpperCase();
+    const mes      = normalizeMes(row[idxMes] || '');
     const categoria = (idxCat >= 0 ? row[idxCat] : '').trim();
     const codigo   = idxCod >= 0 ? parseValue(row[idxCod] || '') : null;
     const producto = (idxProd >= 0 ? row[idxProd] : '').trim();
