@@ -315,8 +315,6 @@ function _startAutoRefresh() {
 // ── Sidebar navigation ─────────────────────────────────────────────────────
 const SECTION_TITLES = {
   dashboard:   'Dashboard',
-  evolucion:   'Evolución',
-  categorias:  'Categorías',
   tabla:       'Tabla de items',
   bcg:         'Matriz BCG',
   seguimiento: 'Seguimiento',
@@ -1348,18 +1346,13 @@ function renderAll(data) {
     state._catalogReady = true;
   }
 
-  // Dashboard
+  // Dashboard (incluye Evolución y Categorías)
   renderSummary(data.summary);
   renderPareto(data.pareto);
   renderDonut(data.categorias, 'chart-donut', 'cat-legend');
   renderABCCards(data.pareto);
-
-  // Evolución
   renderEvolucion(data.evolucion);
   renderEvolucionCat(data);
-
-  // Categorías
-  renderDonut(data.categorias, 'chart-donut2', null);
   renderCatBar(data.categorias);
   renderCatTable(data.categorias);
 

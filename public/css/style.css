@@ -259,6 +259,15 @@ body {
 .s-value { font-size: 1.55rem; font-weight: 700; line-height: 1.2; }
 .s-sub   { font-size: 0.72rem; color: var(--muted); margin-top: 3px; }
 
+/* ── Dashboard section label (separador visual) ──────────────────────────── */
+.dash-section-label {
+  font-size: 0.7rem; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.1em;
+  padding: 4px 2px 0;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
 /* ── Two col ─────────────────────────────────────────────────────────────── */
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
 @media (max-width: 960px) { .two-col { grid-template-columns: 1fr; } }

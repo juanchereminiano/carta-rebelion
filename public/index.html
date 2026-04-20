@@ -24,14 +24,6 @@
       <span class="nav-icon">▦</span>
       <span class="nav-label">Dashboard</span>
     </a>
-    <a class="nav-item" data-section="evolucion">
-      <span class="nav-icon">↗</span>
-      <span class="nav-label">Evolución</span>
-    </a>
-    <a class="nav-item" data-section="categorias">
-      <span class="nav-icon">◉</span>
-      <span class="nav-label">Categorías</span>
-    </a>
     <a class="nav-item" data-section="tabla">
       <span class="nav-icon">≡</span>
       <span class="nav-label">Tabla de items</span>
@@ -101,6 +93,7 @@
     <!-- DASHBOARD ─────────────────────────────────────────────────────── -->
     <section id="section-dashboard" class="page-section active">
 
+      <!-- KPIs -->
       <div id="summary-grid" class="summary-grid">
         <div class="summary-card skeleton-card"><div class="skeleton" style="height:70px"></div></div>
         <div class="summary-card skeleton-card"><div class="skeleton" style="height:70px"></div></div>
@@ -108,6 +101,7 @@
         <div class="summary-card skeleton-card"><div class="skeleton" style="height:70px"></div></div>
       </div>
 
+      <!-- Pareto + Donut -->
       <div class="two-col">
         <div class="card">
           <div class="card-header-row">
@@ -118,73 +112,66 @@
               <span class="abc-badge c">C</span>Cola
             </div>
           </div>
-          <div class="chart-wrap" style="height:340px">
+          <div class="chart-wrap" style="height:320px">
             <canvas id="chart-pareto"></canvas>
           </div>
         </div>
         <div class="card">
           <h2>Distribución por categoría</h2>
-          <div class="chart-wrap" style="height:240px">
+          <div class="chart-wrap" style="height:220px">
             <canvas id="chart-donut"></canvas>
           </div>
           <div id="cat-legend" class="cat-legend"></div>
         </div>
       </div>
 
+      <!-- ABC cards -->
       <div id="abc-cards" class="abc-summary-grid"></div>
 
-    </section>
-
-    <!-- EVOLUCIÓN ─────────────────────────────────────────────────────── -->
-    <section id="section-evolucion" class="page-section">
+      <!-- Evolución temporal -->
+      <div class="dash-section-label">Evolución</div>
       <div class="card">
         <h2>Evolución mensual de ventas</h2>
-        <div class="chart-wrap" style="height:360px">
+        <div class="chart-wrap" style="height:300px">
           <canvas id="chart-evolucion"></canvas>
         </div>
       </div>
-      <div class="card" style="margin-top:0">
+      <div class="card">
         <h2>Evolución por categoría — Top 6</h2>
-        <div class="chart-wrap" style="height:360px">
+        <div class="chart-wrap" style="height:300px">
           <canvas id="chart-evolucion-cat"></canvas>
         </div>
       </div>
-    </section>
 
-    <!-- CATEGORÍAS ────────────────────────────────────────────────────── -->
-    <section id="section-categorias" class="page-section">
+      <!-- Categorías -->
+      <div class="dash-section-label">Categorías</div>
       <div class="two-col">
         <div class="card">
-          <h2>Distribución por categoría</h2>
-          <div class="chart-wrap" style="height:300px">
-            <canvas id="chart-donut2"></canvas>
-          </div>
-        </div>
-        <div class="card">
           <h2>Ventas por categoría</h2>
-          <div class="chart-wrap" style="height:300px">
+          <div class="chart-wrap" style="height:280px">
             <canvas id="chart-cat-bar"></canvas>
           </div>
         </div>
-      </div>
-      <div class="card">
-        <h2>Detalle por categoría</h2>
-        <div class="table-wrap">
-          <table class="metrics-table">
-            <thead>
-              <tr>
-                <th style="text-align:left">Categoría</th>
-                <th>Items</th>
-                <th>Ventas $</th>
-                <th>Cantidad</th>
-                <th>% del total</th>
-                <th>Precio prom.</th>
-              </tr>
-            </thead>
-            <tbody id="cat-tbody"></tbody>
-          </table>
+        <div class="card">
+          <h2>Detalle por categoría</h2>
+          <div class="table-wrap">
+            <table class="metrics-table">
+              <thead>
+                <tr>
+                  <th style="text-align:left">Categoría</th>
+                  <th>Items</th>
+                  <th>Ventas $</th>
+                  <th>Cantidad</th>
+                  <th>% total</th>
+                  <th>Precio prom.</th>
+                </tr>
+              </thead>
+              <tbody id="cat-tbody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
+
     </section>
 
     <!-- TABLA ─────────────────────────────────────────────────────────── -->
