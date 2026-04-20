@@ -496,7 +496,29 @@ body {
 .seg-hint {
   font-size: 0.75rem; color: var(--muted); white-space: nowrap;
 }
-.seg-search-row { margin-bottom: 12px; }
+.seg-search-row { margin-bottom: 10px; }
+
+/* Fila de filtros propios del seguimiento */
+.seg-filters {
+  display: flex; align-items: center; gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+.seg-filters-label {
+  font-size: 0.72rem; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.seg-apply-btn {
+  padding: 5px 14px; border-radius: 20px;
+  background: var(--accent); border: none; color: #fff;
+  font-size: 0.78rem; font-weight: 600; cursor: pointer;
+  transition: background 0.15s; white-space: nowrap;
+  margin-left: auto;
+}
+.seg-apply-btn:hover { background: var(--accent-hi); }
 .seg-search-box { position: relative; display: inline-block; width: 100%; max-width: 380px; }
 .seg-input { width: 100%; padding-right: 36px; }
 

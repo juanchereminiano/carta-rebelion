@@ -919,12 +919,21 @@ function renderBCG(data) {
 
 // ── SEGUIMIENTO ────────────────────────────────────────────────────────────
 
+// Estado propio del seguimiento (independiente de los filtros globales)
+const segState = {
+  anos:   ['all'],
+  meses:  ['all'],
+  metric: 'ventas',
+};
+let segMsAno, segMsMes;  // instancias MultiSelect propias
+
 function saveSegList() {
   localStorage.setItem(SEG_KEY, JSON.stringify(segList));
 }
 
 function renderSegChips() {
   const container = document.getElementById('seg-chips');
+  if (!container) return;
   container.innerHTML = segList.map((name, i) => `
     <div class="seg-chip">
       <span>${name}</span>
@@ -941,9 +950,45 @@ function renderSegChips() {
   });
 }
 
+function initSegFilters() {
+  // MultiSelect Año y Mes propios de la sección
+  segMsAno = new MultiSelect({
+    container: document.getElementById('seg-ms-ano'),
+    label: 'Año',
+    onChange: vals => { segState.anos = vals; },
+  });
+  segMsMes = new MultiSelect({
+    container: document.getElementById('seg-ms-mes'),
+    label: 'Mes',
+    onChange: vals => { segState.meses = vals; },
+  });
+
+  // Métrica propia
+  document.getElementById('seg-metric-ventas').addEventListener('click', () => {
+    segState.metric = 'ventas';
+    document.getElementById('seg-metric-ventas').classList.add('active');
+    document.getElementById('seg-metric-cantidad').classList.remove('active');
+  });
+  document.getElementById('seg-metric-cantidad').addEventListener('click', () => {
+    segState.metric = 'cantidad';
+    document.getElementById('seg-metric-cantidad').classList.add('active');
+    document.getElementById('seg-metric-ventas').classList.remove('active');
+  });
+
+  // Botón Ver datos
+  document.getElementById('seg-btn-apply').addEventListener('click', loadSeguimiento);
+}
+
+function populateSegCatalog(cat) {
+  // Llamado luego de cargar el catálogo global — llena los dropdowns del seguimiento
+  if (segMsAno) segMsAno.setOptions(cat.anos.map(a => ({ value: String(a), text: String(a) })));
+  if (segMsMes) segMsMes.setOptions(cat.meses.map(m => ({ value: m, text: m.charAt(0) + m.slice(1).toLowerCase() })));
+}
+
 function initSegSearch() {
   const input       = document.getElementById('seg-input');
   const suggestions = document.getElementById('seg-suggestions');
+  if (!input) return;
 
   input.addEventListener('input', () => {
     const q = input.value.trim().toLowerCase();
@@ -982,15 +1027,14 @@ function initSegSearch() {
   });
 
   document.addEventListener('click', e => {
-    if (!input.contains(e.target) && !suggestions.contains(e.target)) {
+    if (!input.contains(e.target) && !suggestions.contains(e.target))
       suggestions.classList.remove('open');
-    }
   });
 }
 
 async function loadSeguimiento() {
-  const grid    = document.getElementById('seg-grid');
-  const empty   = document.getElementById('seg-empty');
+  const grid     = document.getElementById('seg-grid');
+  const empty    = document.getElementById('seg-empty');
   const combCard = document.getElementById('seg-combined-card');
 
   if (segList.length === 0) {
@@ -1001,56 +1045,76 @@ async function loadSeguimiento() {
   }
 
   empty.style.display = 'none';
-  grid.innerHTML = '<p style="color:var(--muted);font-size:0.82rem;padding:8px">Cargando…</p>';
+  grid.innerHTML = '<p style="color:var(--muted);font-size:0.82rem;padding:8px 0">Cargando…</p>';
 
   try {
     const params = new URLSearchParams({ productos: segList.join(',') });
-    const data   = await fetch(`/api/seguimiento?${params}`).then(r => r.json());
+    if (!segState.anos.includes('all'))  params.set('anos',  segState.anos.join(','));
+    if (!segState.meses.includes('all')) params.set('meses', segState.meses.join(','));
+
+    const data = await fetch(`/api/seguimiento?${params}`).then(r => r.json());
     if (data.error) throw new Error(data.error);
+
+    // Etiqueta de período en el gráfico combinado
+    const periodLabel = _buildPeriodLabel();
+    const labelEl = document.getElementById('seg-period-label');
+    if (labelEl) labelEl.textContent = periodLabel;
 
     renderSegCards(data);
     renderSegCombined(data);
-    combCard.style.display = segList.length > 1 ? '' : 'none';
+    combCard.style.display = Object.keys(data.productos).length > 1 ? '' : 'none';
   } catch (err) {
-    grid.innerHTML = `<p style="color:#e03c5a;padding:8px">Error: ${err.message}</p>`;
+    grid.innerHTML = `<p style="color:#e03c5a;padding:8px 0">Error: ${err.message}</p>`;
   }
+}
+
+function _buildPeriodLabel() {
+  const aLabel = segState.anos.includes('all')  ? 'Todos los años'  : segState.anos.join(', ');
+  const mLabel = segState.meses.includes('all') ? 'Todos los meses' : segState.meses.map(m => m.charAt(0) + m.slice(1).toLowerCase()).join(', ');
+  return `${aLabel} · ${mLabel}`;
+}
+
+function _segTrendBlock(trend, label) {
+  if (trend === null) return '';
+  let cls = 'flat', icon = '→', txt = 'Estable';
+  if (trend > 1)       { cls = 'up';   icon = '↑'; txt = `+${trend.toFixed(1)}%`; }
+  else if (trend < -1) { cls = 'down'; icon = '↓'; txt = `${trend.toFixed(1)}%`; }
+  return `<div class="seg-trend ${cls}">${icon} ${txt} <span style="font-weight:400;opacity:0.65;font-size:0.68rem">${label}</span></div>`;
 }
 
 function renderSegCards(data) {
   const grid  = document.getElementById('seg-grid');
-  const isV   = state.metric === 'ventas';
+  const isV   = segState.metric === 'ventas';
   const prods = Object.entries(data.productos);
 
   if (prods.length === 0) {
-    grid.innerHTML = '<p style="color:var(--muted);font-size:0.82rem;padding:8px">Sin datos para los productos seleccionados.</p>';
+    grid.innerHTML = '<p style="color:var(--muted);font-size:0.82rem;padding:8px 0">Sin datos para el período seleccionado.</p>';
     return;
   }
 
-  // Destruir sparkline charts anteriores
+  // Destruir sparklines anteriores
   Object.keys(charts).filter(k => k.startsWith('seg-spark-')).forEach(k => {
     charts[k].destroy(); delete charts[k];
   });
 
   grid.innerHTML = prods.map(([prod, d], i) => {
     const color = SEG_PALETTE[i % SEG_PALETTE.length];
-    const trend = d.trendVentas;
-    let trendClass = 'flat', trendIcon = '→', trendTxt = 'Sin comparación';
-    if (trend !== null) {
-      if (trend > 1)       { trendClass = 'up';   trendIcon = '↑'; trendTxt = `+${trend.toFixed(1)}%`; }
-      else if (trend < -1) { trendClass = 'down'; trendIcon = '↓'; trendTxt = `${trend.toFixed(1)}%`; }
-      else                  { trendTxt = 'Estable'; }
-    }
+    const trend = isV ? d.trendVentas : d.trendCantidad;
+    const trendBlock = _segTrendBlock(trend, 'vs 3m ant.');
+    const cat = d.categoria && d.categoria !== '—' ? d.categoria : null;
+
     return `
       <div class="seg-card">
         <div class="seg-card-header">
-          <div>
+          <div style="flex:1;min-width:0">
             <div class="seg-card-name">${prod}</div>
+            ${cat ? `<div class="seg-card-cat"><span class="cat-tag">${cat}</span></div>` : ''}
           </div>
           <div class="seg-card-badge" style="background:${color}"></div>
         </div>
         <div class="seg-kpis">
           <div class="seg-kpi">
-            <span class="seg-kpi-label">Ventas totales</span>
+            <span class="seg-kpi-label">Ventas</span>
             <span class="seg-kpi-val">${fmt.pesos(d.totalVentas)}</span>
           </div>
           <div class="seg-kpi">
@@ -1062,13 +1126,13 @@ function renderSegCards(data) {
             <span class="seg-kpi-val">${fmt.pesosFull(d.precioPromedio)}</span>
           </div>` : ''}
         </div>
-        <div class="seg-trend ${trendClass}">${trendIcon} ${trendTxt} <span style="font-weight:400;opacity:0.7;font-size:0.68rem">vs 3m ant.</span></div>
+        ${trendBlock}
         <div class="seg-sparkline"><canvas id="seg-spark-${i}"></canvas></div>
       </div>`;
   }).join('');
 
-  // Dibujar sparklines
-  prods.forEach(([prod, d], i) => {
+  // Sparklines
+  prods.forEach(([, d], i) => {
     const color  = SEG_PALETTE[i % SEG_PALETTE.length];
     const values = isV ? d.ventas : d.cantidad;
     const ctx    = document.getElementById(`seg-spark-${i}`);
@@ -1080,26 +1144,23 @@ function renderSegCards(data) {
         datasets: [{
           data: values, borderColor: color,
           backgroundColor: color + '18',
-          borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true,
+          borderWidth: 2, pointRadius: 2, tension: 0.4, fill: true,
         }],
       },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false }, tooltip: {
           ...CHART_DEFAULTS.tooltip,
-          callbacks: { label: ctx => isV ? ` ${fmt.pesos(ctx.parsed.y)}` : ` ${fmt.num(ctx.parsed.y)} uds` },
+          callbacks: { label: c => isV ? ` ${fmt.pesos(c.parsed.y)}` : ` ${fmt.num(c.parsed.y)} uds` },
         }},
-        scales: {
-          x: { display: false },
-          y: { display: false },
-        },
+        scales: { x: { display: false }, y: { display: false } },
       },
     });
   });
 }
 
 function renderSegCombined(data) {
-  const isV    = state.metric === 'ventas';
+  const isV    = segState.metric === 'ventas';
   const prods  = Object.entries(data.productos);
   const datasets = prods.map(([prod, d], i) => ({
     label: prod,
@@ -1149,6 +1210,7 @@ function renderAll(data) {
   // Catálogo (solo la primera vez o en refresh total)
   if (!state._catalogReady && data.catalog) {
     populateCatalog(data.catalog);
+    populateSegCatalog(data.catalog);  // también los filtros del seguimiento
     state._catalogReady = true;
   }
 
@@ -1224,6 +1286,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
 
 // Iniciar
 initFilters();
+initSegFilters();
 renderSegChips();
 initSegSearch();
 _startAutoRefresh();   // auto-refresh cada 60s

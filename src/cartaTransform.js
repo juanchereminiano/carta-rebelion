@@ -261,7 +261,7 @@ function buildProductEvolucion(records, productos = []) {
     if (!r.producto || !r.ano || !r.mes) continue;
     const tKey = `${r.ano}-${String(MES_ORDER.indexOf(r.mes)).padStart(2, '0')}`;
     timeMap[tKey] = { ano: r.ano, mes: r.mes };
-    if (!byProd[r.producto]) byProd[r.producto] = {};
+    if (!byProd[r.producto]) byProd[r.producto] = { _categoria: r.categoria || '—' };
     if (!byProd[r.producto][tKey]) byProd[r.producto][tKey] = { ventas: 0, cantidad: 0 };
     byProd[r.producto][tKey].ventas   += r.dinero || 0;
     byProd[r.producto][tKey].cantidad += r.cant   || 0;
@@ -285,10 +285,16 @@ function buildProductEvolucion(records, productos = []) {
     const prev3 = ventasArr.slice(-6, -3).reduce((s, v) => s + v, 0);
     const trendVentas = prev3 > 0 ? ((last3 - prev3) / prev3) * 100 : null;
 
+    // Tendencia cantidad
+    const last3c = cantidadArr.slice(-3).reduce((s, v) => s + v, 0);
+    const prev3c = cantidadArr.slice(-6, -3).reduce((s, v) => s + v, 0);
+    const trendCantidad = prev3c > 0 ? ((last3c - prev3c) / prev3c) * 100 : null;
+
     resultado[prod] = {
       ventas: ventasArr, cantidad: cantidadArr,
       totalVentas, totalCantidad,
-      trendVentas,
+      trendVentas, trendCantidad,
+      categoria: byKey._categoria || '—',
       precioPromedio: totalCantidad > 0 ? Math.round(totalVentas / totalCantidad) : null,
     };
   }

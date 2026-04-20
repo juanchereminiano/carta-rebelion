@@ -243,12 +243,14 @@
     <!-- SEGUIMIENTO ──────────────────────────────────────────────────── -->
     <section id="section-seguimiento" class="page-section">
 
-      <!-- Buscador para agregar productos -->
+      <!-- Buscador + filtros propios -->
       <div class="card seg-search-card">
         <div class="card-header-row">
           <h2>Productos en seguimiento</h2>
-          <span class="seg-hint">Buscá y sumá los que querés monitorear</span>
+          <span class="seg-hint">Buscá y sumá los productos que querés monitorear</span>
         </div>
+
+        <!-- Buscador para agregar productos -->
         <div class="seg-search-row">
           <div class="seg-search-box">
             <input id="seg-input" class="search-input seg-input" type="text"
@@ -256,12 +258,29 @@
             <div id="seg-suggestions" class="seg-suggestions"></div>
           </div>
         </div>
+
+        <!-- Chips de productos agregados -->
         <div id="seg-chips" class="seg-chips"></div>
+
+        <!-- Filtros propios: Año y Mes -->
+        <div class="seg-filters" id="seg-filters-row">
+          <span class="seg-filters-label">Filtrar por:</span>
+          <div id="seg-ms-ano" class="ms-wrap"></div>
+          <div id="seg-ms-mes" class="ms-wrap"></div>
+          <div class="filter-chips metric-toggle">
+            <button class="chip active" id="seg-metric-ventas"   data-metric="ventas">$ Ventas</button>
+            <button class="chip"        id="seg-metric-cantidad" data-metric="cantidad">Cantidades</button>
+          </div>
+          <button id="seg-btn-apply" class="seg-apply-btn">Ver datos</button>
+        </div>
       </div>
 
       <!-- Gráfico comparativo combinado -->
       <div class="card" id="seg-combined-card" style="display:none">
-        <h2>Evolución comparada — todos los períodos</h2>
+        <div class="card-header-row">
+          <h2>Evolución comparada</h2>
+          <span id="seg-period-label" style="font-size:0.75rem;color:var(--muted)"></span>
+        </div>
         <div class="chart-wrap" style="height:320px">
           <canvas id="chart-seguimiento"></canvas>
         </div>

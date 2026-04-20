@@ -74,12 +74,17 @@ app.get('/api/carta', async (req, res) => {
   }
 });
 
-// Seguimiento — evolución mensual por producto
+// Seguimiento — evolución mensual por producto (con filtros propios de año y mes)
 app.get('/api/seguimiento', async (req, res) => {
   try {
     const { records } = await getData();
     const productos = req.query.productos ? req.query.productos.split(',').map(s => s.trim()).filter(Boolean) : [];
-    res.json(buildProductEvolucion(records, productos));
+    const anos      = req.query.anos      ? req.query.anos.split(',').map(s => s.trim())      : ['all'];
+    const meses     = req.query.meses     ? req.query.meses.split(',').map(s => s.trim())     : ['all'];
+
+    // Filtrar por año/mes pero NO por categoría/producto globales — solo los del watchlist
+    const filtered = filterRecords(records, { anos, meses });
+    res.json(buildProductEvolucion(filtered, productos));
   } catch (err) {
     console.error('Error /api/seguimiento:', err.message);
     res.status(500).json({ error: err.message });
