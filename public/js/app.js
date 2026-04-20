@@ -806,29 +806,38 @@ const bcgQuadrantPlugin = {
 };
 
 function renderBCG(data) {
-  const bcgItems = data.bcgData && data.bcgData.length > 0
-    ? data.bcgData
-    : [];
+  const bcgItems = data.bcgData && data.bcgData.length > 0 ? data.bcgData : [];
 
   if (bcgItems.length === 0) {
     document.getElementById('bcg-cards').innerHTML =
-      '<p style="color:var(--muted);grid-column:1/-1;text-align:center;padding:24px">No hay suficientes datos para la matriz BCG (se necesitan al menos 2 años).</p>';
+      '<p style="color:var(--muted);grid-column:1/-1;text-align:center;padding:24px">Sin datos suficientes.</p>';
     return;
   }
 
+  // Umbral X = participación promedio (dinámico, viene del backend)
+  const avgShare = bcgItems[0]?.avgShare ?? (100 / bcgItems.length);
   const totalVentas = bcgItems.reduce((s, i) => s + i.ventas, 0) || 1;
+  const noYoY = bcgItems.every(i => !i.hasYoY);
+
+  // Rango dinámico de ejes
+  const allX = bcgItems.map(i => i.pctShare);
+  const allY = bcgItems.map(i => i.growth);
+  const xMax = Math.ceil((Math.max(...allX) * 1.2) / 1 ) || 20;
+  const yAbsMax = Math.ceil(Math.max(Math.abs(Math.min(...allY)), Math.abs(Math.max(...allY))) * 1.2 / 10) * 10 || 50;
 
   const datasets = ['Estrella','Vaca','Interrogante','Perro'].map(q => {
     const qItems = bcgItems.filter(i => i.cuadrante === q);
     return {
       label: q,
       data: qItems.map(i => ({
-        x: parseFloat(i.relShare.toFixed(1)),
-        y: parseFloat(i.growth.toFixed(1)),
-        r: Math.max(5, Math.min(22, (i.ventas / totalVentas) * 500)),
+        x:        parseFloat(i.pctShare.toFixed(2)),
+        y:        parseFloat(i.growth.toFixed(1)),
+        r:        Math.max(5, Math.min(24, (i.ventas / totalVentas) * 600)),
         producto: i.producto,
         ventas:   i.ventas,
         growth:   i.growth,
+        hasYoY:   i.hasYoY,
+        pctShare: i.pctShare,
       })),
       backgroundColor: BCG_CONFIG[q].color + 'bb',
       borderColor:     BCG_CONFIG[q].color,
@@ -836,22 +845,60 @@ function renderBCG(data) {
     };
   });
 
-  // Calcular rango dinámico de los ejes
-  const allX = bcgItems.map(i => i.relShare);
-  const allY = bcgItems.map(i => i.growth);
-  const xMax = Math.min(100, Math.ceil((Math.max(...allX) * 1.15) / 10) * 10 || 100);
-  const yAbsMax = Math.ceil((Math.max(Math.abs(Math.min(...allY)), Math.abs(Math.max(...allY))) * 1.2) / 10) * 10 || 50;
+  // Plugin cuadrantes — usa avgShare como umbral X, 0% como umbral Y
+  const bcgQPlugin = {
+    id: 'bcgQuadrants',
+    beforeDraw(chart) {
+      const { ctx, chartArea, scales } = chart;
+      if (!chartArea || !scales.x || !scales.y) return;
+      const { left, right, top, bottom } = chartArea;
 
-  // Destruir y recrear el chart con el plugin (upsertChart no soporta plugins nuevos)
-  if (charts['chart-bcg']) {
-    charts['chart-bcg'].destroy();
-    delete charts['chart-bcg'];
-  }
+      const xMid = Math.max(left,  Math.min(right,  scales.x.getPixelForValue(avgShare)));
+      const yMid = Math.max(top,   Math.min(bottom, scales.y.getPixelForValue(0)));
+
+      const quads = [
+        { color: BCG_CONFIG.Interrogante.bg, x: left,  y: top,  w: xMid-left,  h: yMid-top,    label: 'Interrogante', lx: left+8,    ly: top+14,    anchor:'left',  baseline:'top' },
+        { color: BCG_CONFIG.Estrella.bg,     x: xMid,  y: top,  w: right-xMid, h: yMid-top,    label: 'Estrella',     lx: right-8,   ly: top+14,    anchor:'right', baseline:'top' },
+        { color: BCG_CONFIG.Perro.bg,        x: left,  y: yMid, w: xMid-left,  h: bottom-yMid, label: 'Perro',        lx: left+8,    ly: bottom-8,  anchor:'left',  baseline:'bottom' },
+        { color: BCG_CONFIG.Vaca.bg,         x: xMid,  y: yMid, w: right-xMid, h: bottom-yMid, label: 'Vaca',         lx: right-8,   ly: bottom-8,  anchor:'right', baseline:'bottom' },
+      ];
+
+      ctx.save();
+      quads.forEach(q => {
+        ctx.fillStyle = q.color;
+        ctx.fillRect(q.x, q.y, q.w, q.h);
+        ctx.font = 'bold 11px system-ui, sans-serif';
+        ctx.fillStyle = 'rgba(0,0,0,0.22)';
+        ctx.textAlign    = q.anchor;
+        ctx.textBaseline = q.baseline;
+        ctx.fillText(q.label.toUpperCase(), q.lx, q.ly);
+      });
+
+      // Líneas divisorias
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(xMid, top);    ctx.lineTo(xMid, bottom);  ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(left, yMid);   ctx.lineTo(right, yMid);   ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Etiqueta de umbral X (participación promedio)
+      ctx.font = '10px system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText(`↕ promedio (${avgShare.toFixed(1)}%)`, xMid, bottom - 2);
+
+      ctx.restore();
+    },
+  };
+
+  if (charts['chart-bcg']) { charts['chart-bcg'].destroy(); delete charts['chart-bcg']; }
+
   charts['chart-bcg'] = new Chart(
     document.getElementById('chart-bcg').getContext('2d'),
     {
       type: 'bubble',
-      plugins: [bcgQuadrantPlugin],
+      plugins: [bcgQPlugin],
       data: { datasets },
       options: {
         responsive: true, maintainAspectRatio: false,
@@ -860,10 +907,13 @@ function renderBCG(data) {
           tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
             label: ctx => {
               const d = ctx.raw;
+              const growthLine = d.hasYoY
+                ? `  Crecimiento YoY: ${d.growth >= 0 ? '+' : ''}${d.growth.toFixed(1)}%`
+                : `  Crecimiento YoY: sin dato (nuevo)`;
               return [
                 `  ${d.producto}`,
-                `  Participación: ${d.x.toFixed(1)}%`,
-                `  Crecimiento YoY: ${d.growth >= 0 ? '+' : ''}${d.growth.toFixed(1)}%`,
+                `  Participación en ventas: ${d.pctShare.toFixed(2)}%`,
+                growthLine,
                 `  Ventas: ${fmt.pesos(d.ventas)}`,
               ];
             },
@@ -872,12 +922,13 @@ function renderBCG(data) {
         scales: {
           x: {
             min: 0, max: xMax,
-            title: { display: true, text: 'Participación relativa (%)', color: '#7a7060', font: { size: 11 } },
+            title: { display: true, text: 'Participación en ventas totales (%)', color: '#7a7060', font: { size: 11 } },
             grid: { color: '#e8e3db' },
-            ticks: { color: '#7a7060', callback: v => v + '%' },
+            ticks: { color: '#7a7060', callback: v => v.toFixed(1) + '%' },
           },
           y: {
-            min: -yAbsMax, max: yAbsMax,
+            min: noYoY ? -10 : -yAbsMax,
+            max: noYoY ?  10 :  yAbsMax,
             title: { display: true, text: 'Crecimiento año a año (%)', color: '#7a7060', font: { size: 11 } },
             grid: { color: '#e8e3db' },
             ticks: { color: '#7a7060', callback: v => (v >= 0 ? '+' : '') + v + '%' },
@@ -887,8 +938,15 @@ function renderBCG(data) {
     }
   );
 
-  // BCG cards por cuadrante
-  document.getElementById('bcg-cards').innerHTML = ['Estrella','Vaca','Interrogante','Perro'].map(q => {
+  // Nota metodológica debajo del gráfico
+  const nota = noYoY
+    ? '⚠️ Solo hay datos de un año — el crecimiento YoY no está disponible. Todos los productos aparecen en Y=0.'
+    : `Umbral horizontal: participación promedio por producto (${avgShare.toFixed(1)}%). Umbral vertical: 0% de crecimiento YoY. Tamaño de burbuja = ventas absolutas.`;
+
+  // Cards por cuadrante
+  document.getElementById('bcg-cards').innerHTML = `
+    <div class="bcg-nota" style="grid-column:1/-1">${nota}</div>
+    ` + ['Estrella','Vaca','Interrogante','Perro'].map(q => {
     const cfg   = BCG_CONFIG[q];
     const items = bcgItems.filter(i => i.cuadrante === q).slice(0, 8);
     const total = bcgItems.filter(i => i.cuadrante === q).length;
@@ -905,15 +963,16 @@ function renderBCG(data) {
           ${items.map(i => `
             <div class="bcg-item">
               <span class="bcg-item-name" title="${i.producto}">${i.producto}</span>
-              <span class="bcg-item-val">${fmt.pesos(i.ventas)}</span>
+              <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+                <span class="bcg-item-val">${fmt.pesos(i.ventas)}</span>
+                <span style="font-size:0.65rem;color:var(--muted)">${i.pctShare.toFixed(1)}%</span>
+                ${i.hasYoY ? `<span style="font-size:0.65rem;color:${i.growth>=0?'#28a67e':'#c0334f'}">${i.growth>=0?'+':''}${i.growth.toFixed(0)}%</span>` : ''}
+              </div>
             </div>
           `).join('')}
-          ${total > 8
-            ? `<div style="font-size:0.7rem;color:var(--muted);text-align:center;padding:4px">+${total - 8} más</div>`
-            : ''}
+          ${total > 8 ? `<div style="font-size:0.7rem;color:var(--muted);text-align:center;padding:4px">+${total - 8} más</div>` : ''}
         </div>
-      </div>
-    `;
+      </div>`;
   }).join('');
 }
 

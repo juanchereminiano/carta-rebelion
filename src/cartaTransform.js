@@ -174,77 +174,95 @@ function buildTopItems(records, n = 30) {
   return items.slice(0, n);
 }
 
-// ── Matriz BCG — crecimiento real AñoAño por producto ─────────────────────────
+// ── Matriz BCG adaptada — participación interna + crecimiento YoY ─────────────
+//
+// NOTA METODOLÓGICA:
+// La BCG clásica usa share de mercado externo (vs competidores) y crecimiento del
+// mercado (industria). Sin esos datos, esta es una adaptación para análisis interno:
+//
+//   Eje X — % de participación en ventas totales del período más reciente
+//            Umbral: promedio simple (100% / n_productos).
+//            Un producto "encima" del promedio tiene alta participación relativa.
+//
+//   Eje Y — Crecimiento YoY: (ventas último año - ventas año anterior) / ventas año anterior
+//            Umbral: 0% (creciendo vs cayendo).
+//            Para productos sin año anterior, growth = null (aparecen en el eje).
+//
+// Esto permite clasificar la carta con los datos disponibles de forma honesta.
+//
 function buildBCGData(records) {
   const años = [...new Set(records.map(r => r.ano).filter(Boolean))].sort();
-  if (años.length < 2) {
-    // Con un solo año no hay YoY; devolvemos igual usando share relativo
-    const lastYear = años[0];
-    const byProduct = {};
-    for (const r of records) {
-      if (!r.producto || !r.ano) continue;
-      if (!byProduct[r.producto]) byProduct[r.producto] = { categoria: r.categoria, ventas: 0, cantidad: 0 };
-      byProduct[r.producto].ventas   += r.dinero || 0;
-      byProduct[r.producto].cantidad += r.cant   || 0;
-    }
-    const items = Object.values(byProduct).map(d => ({ ...d, growth: null }));
-    const maxVentas = Math.max(...items.map(i => i.ventas), 1);
-    return items.map(item => {
-      const relShare = (item.ventas / maxVentas) * 100;
-      const cuadrante = relShare >= 15 ? 'Vaca' : 'Perro';
-      return { producto: item.producto || '?', categoria: item.categoria, ventas: item.ventas,
-               cantidad: item.cantidad, growth: null, relShare, cuadrante };
-    });
-  }
-
+  const hasMultiYear = años.length >= 2;
   const lastYear = años[años.length - 1];
-  const prevYear = años[años.length - 2];
+  const prevYear = hasMultiYear ? años[años.length - 2] : null;
 
   // Agrupar por producto + año
   const byProduct = {};
   for (const r of records) {
     if (!r.producto || !r.ano) continue;
-    if (!byProduct[r.producto]) byProduct[r.producto] = { categoria: r.categoria || '—', byYear: {} };
+    if (!byProduct[r.producto])
+      byProduct[r.producto] = { categoria: r.categoria || '—', byYear: {} };
     if (!byProduct[r.producto].byYear[r.ano])
       byProduct[r.producto].byYear[r.ano] = { ventas: 0, cantidad: 0 };
     byProduct[r.producto].byYear[r.ano].ventas   += r.dinero || 0;
     byProduct[r.producto].byYear[r.ano].cantidad += r.cant   || 0;
   }
 
+  // Construir lista con ventas del último año y crecimiento YoY
   const items = [];
   for (const [producto, data] of Object.entries(byProduct)) {
     const curr = data.byYear[lastYear];
-    const prev = data.byYear[prevYear];
-    if (!curr || curr.ventas === 0) continue;
+    if (!curr || curr.ventas === 0) continue;      // excluir sin ventas recientes
+
+    const prev   = prevYear ? data.byYear[prevYear] : null;
     const growth = prev && prev.ventas > 0
       ? ((curr.ventas - prev.ventas) / prev.ventas) * 100
-      : null;
+      : null;   // null = sin comparación disponible
+
     items.push({
       producto,
-      categoria: data.categoria,
-      ventas:    curr.ventas,
-      cantidad:  curr.cantidad,
-      growth,
+      categoria:  data.categoria,
+      ventas:     curr.ventas,
+      cantidad:   curr.cantidad,
       prevVentas: prev?.ventas || 0,
+      growth,
     });
   }
 
-  const maxVentas = Math.max(...items.map(i => i.ventas), 1);
-  // Mediana de growth para centrar el eje
-  const growthsKnown = items.map(i => i.growth).filter(g => g !== null).sort((a,b)=>a-b);
-  const medianGrowth = growthsKnown.length > 0
-    ? growthsKnown[Math.floor(growthsKnown.length / 2)]
-    : 0;
+  if (items.length === 0) return [];
+
+  // ── Eje X: % de participación sobre el total de ventas del último año ────
+  const totalVentas = items.reduce((s, i) => s + i.ventas, 0);
+  // Umbral = participación promedio simple (si todos fueran iguales)
+  const avgShare = items.length > 0 ? 100 / items.length : 0;
+
+  // ── Eje Y: mediana de growth (para productos sin YoY, usamos 0) ──────────
+  const growthsKnown = items.map(i => i.growth).filter(g => g !== null).sort((a, b) => a - b);
+  // Umbral de crecimiento = 0% (creciendo vs cayendo)
+  const growthThreshold = 0;
 
   return items.map(item => {
-    const relShare = (item.ventas / maxVentas) * 100;
-    const g = item.growth ?? medianGrowth;
+    const pctShare = totalVentas > 0 ? (item.ventas / totalVentas) * 100 : 0;
+    const g        = item.growth ?? 0;  // null → 0 para graficarlo en el eje
+
     let cuadrante;
-    if      (relShare >= 15 && g >= 0) cuadrante = 'Estrella';
-    else if (relShare >= 15 && g <  0) cuadrante = 'Vaca';
-    else if (relShare <  15 && g >= 0) cuadrante = 'Interrogante';
-    else                               cuadrante = 'Perro';
-    return { ...item, relShare, growth: g, cuadrante };
+    const highShare  = pctShare >= avgShare;
+    const highGrowth = g >= growthThreshold;
+
+    if      ( highShare &&  highGrowth) cuadrante = 'Estrella';
+    else if ( highShare && !highGrowth) cuadrante = 'Vaca';
+    else if (!highShare &&  highGrowth) cuadrante = 'Interrogante';
+    else                                cuadrante = 'Perro';
+
+    return {
+      ...item,
+      pctShare:        Math.round(pctShare * 100) / 100,   // % sobre total ventas
+      avgShare:        Math.round(avgShare  * 100) / 100,   // umbral (promedio)
+      growth:          Math.round(g         * 10)  / 10,
+      growthRaw:       item.growth,                          // null si no hay YoY
+      cuadrante,
+      hasYoY:          item.growth !== null,
+    };
   });
 }
 
