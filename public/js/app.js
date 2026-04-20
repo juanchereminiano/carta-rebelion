@@ -2,16 +2,160 @@
 
 // ── Estado global ──────────────────────────────────────────────────────────
 const state = {
-  ano: 'all', metric: 'ventas',
+  // Filtros multi-select (arrays; 'all' = sin restricción)
+  anos:       ['all'],
+  meses:      ['all'],
+  categorias: ['all'],
+  productos:  ['all'],
+  metric:     'ventas',
+  // Tabla
   sortCol: 'rank', sortDir: 'asc',
-  search: '', clase: 'all', cat: 'all',
-  _anosLoaded: false,
+  search: '', clase: 'all', tableCat: 'all',
+  _catalogReady: false,
 };
 
 // Instancias de charts
 const charts = {};
-let allItems = [];
-let rawData  = null;
+let allItems  = [];
+let rawData   = null;
+
+// Catálogo completo (años, meses, cats, productos)
+let catalog = { anos: [], meses: [], categorias: [], productos: [] };
+
+// ── Seguimiento ────────────────────────────────────────────────────────────
+const SEG_KEY = 'carta_seguimiento_v1';
+let segList = JSON.parse(localStorage.getItem(SEG_KEY) || '[]'); // array de nombres
+
+// Paleta de colores para sparklines de seguimiento
+const SEG_PALETTE = ['#3b82f6','#c8a84b','#22c55e','#f43f5e','#a855f7','#14b8a6','#f97316','#6366f1'];
+
+// ── Clase MultiSelect ──────────────────────────────────────────────────────
+class MultiSelect {
+  constructor({ container, label, onChange }) {
+    this.container = container;
+    this.label     = label;
+    this.onChange  = onChange;
+    this.options   = [];   // [{value, text}]
+    this.selected  = new Set(['all']);
+    this._build();
+  }
+
+  _build() {
+    this.container.innerHTML = '';
+    this.btn = document.createElement('button');
+    this.btn.className = 'ms-btn';
+    this.btn.innerHTML =
+      `<span class="ms-label">${this.label}:</span>` +
+      `<span class="ms-summary">Todos</span>` +
+      `<span class="ms-caret">▾</span>`;
+
+    this.panel = document.createElement('div');
+    this.panel.className = 'ms-panel';
+
+    this.container.appendChild(this.btn);
+    this.container.appendChild(this.panel);
+
+    this.btn.addEventListener('click', e => { e.stopPropagation(); this._toggle(); });
+    this.panel.addEventListener('click', e => e.stopPropagation());
+    document.addEventListener('click', () => this._close(), { capture: false });
+  }
+
+  setOptions(options) {
+    this.options = options;
+    // Quitar valores seleccionados que ya no existen
+    const valid = new Set(options.map(o => o.value));
+    for (const v of this.selected) {
+      if (v !== 'all' && !valid.has(v)) this.selected.delete(v);
+    }
+    if (this.selected.size === 0) this.selected.add('all');
+    this._renderPanel();
+    this._updateBtn();
+  }
+
+  _renderPanel() {
+    this.panel.innerHTML = '';
+    if (this.options.length === 0) {
+      this.panel.innerHTML = '<div class="ms-empty">Sin opciones</div>';
+      return;
+    }
+
+    // Opción "Todos"
+    this.panel.appendChild(this._makeOption('all', 'Todos', true));
+
+    if (this.options.length > 0) {
+      const d = document.createElement('div');
+      d.className = 'ms-divider';
+      this.panel.appendChild(d);
+    }
+
+    this.options.forEach(opt => {
+      this.panel.appendChild(this._makeOption(opt.value, opt.text, false));
+    });
+  }
+
+  _makeOption(value, text, isAll) {
+    const lbl = document.createElement('label');
+    lbl.className = 'ms-option' + (isAll ? ' ms-option-all' : '');
+
+    const cb = document.createElement('input');
+    cb.type    = 'checkbox';
+    cb.value   = value;
+    cb.checked = this.selected.has(value);
+
+    cb.addEventListener('change', () => {
+      if (value === 'all') {
+        this.selected.clear();
+        if (cb.checked) this.selected.add('all');
+        else            this.selected.add('all'); // siempre algo seleccionado
+      } else {
+        this.selected.delete('all');
+        if (cb.checked) this.selected.add(value);
+        else            this.selected.delete(value);
+        if (this.selected.size === 0) this.selected.add('all');
+      }
+      this._renderPanel(); // re-render to sync checkboxes
+      this._updateBtn();
+      this.onChange([...this.selected]);
+    });
+
+    lbl.appendChild(cb);
+    lbl.appendChild(document.createTextNode(' ' + text));
+    return lbl;
+  }
+
+  _updateBtn() {
+    const sumEl = this.btn.querySelector('.ms-summary');
+    const isAll = this.selected.has('all');
+    if (isAll) {
+      sumEl.textContent = 'Todos';
+      this.btn.classList.remove('has-filter');
+    } else {
+      const vals = [...this.selected];
+      sumEl.textContent = vals.length === 1 ? vals[0] : `${vals.length} sel.`;
+      this.btn.classList.add('has-filter');
+    }
+  }
+
+  getValue() { return [...this.selected]; }
+
+  reset() {
+    this.selected.clear();
+    this.selected.add('all');
+    this._renderPanel();
+    this._updateBtn();
+  }
+
+  _toggle() {
+    const open = this.panel.classList.contains('open');
+    document.querySelectorAll('.ms-panel.open').forEach(p => p.classList.remove('open'));
+    if (!open) this.panel.classList.add('open');
+  }
+
+  _close() { this.panel.classList.remove('open'); }
+}
+
+// Instancias
+let msAno, msMes, msCat, msProd;
 
 // ── Formateo ───────────────────────────────────────────────────────────────
 const fmt = {
@@ -31,12 +175,13 @@ function showToast(msg) {
 
 // ── Sidebar navigation ─────────────────────────────────────────────────────
 const SECTION_TITLES = {
-  dashboard: 'Dashboard',
-  evolucion: 'Evolución',
-  categorias: 'Categorías',
-  tabla: 'Tabla de items',
-  bcg: 'Matriz BCG',
-  cmv: 'CMV',
+  dashboard:   'Dashboard',
+  evolucion:   'Evolución',
+  categorias:  'Categorías',
+  tabla:       'Tabla de items',
+  bcg:         'Matriz BCG',
+  seguimiento: 'Seguimiento',
+  cmv:         'CMV',
 };
 
 function navigateTo(section) {
@@ -81,26 +226,56 @@ function closeMobileSidebar() {
 }
 document.getElementById('overlay').addEventListener('click', closeMobileSidebar);
 
-// ── Filtros globales ────────────────────────────────────────────────────────
-function buildAnoChips(años) {
-  const container = document.getElementById('filter-ano');
-  container.innerHTML = '<button class="chip active" data-value="all">Todos</button>';
-  años.forEach(a => {
-    const btn = document.createElement('button');
-    btn.className = 'chip';
-    btn.dataset.value = String(a);
-    btn.textContent = a;
-    container.appendChild(btn);
+// ── Filtros globales — MultiSelect ─────────────────────────────────────────
+
+function initFilters() {
+  msAno = new MultiSelect({
+    container: document.getElementById('ms-ano'),
+    label: 'Año',
+    onChange: vals => { state.anos = vals; loadData(); },
   });
-  container.addEventListener('click', e => {
-    const btn = e.target.closest('.chip');
-    if (!btn) return;
-    state.ano = btn.dataset.value;
-    container.querySelectorAll('.chip').forEach(b => b.classList.toggle('active', b.dataset.value === state.ano));
-    loadData();
+  msMes = new MultiSelect({
+    container: document.getElementById('ms-mes'),
+    label: 'Mes',
+    onChange: vals => { state.meses = vals; loadData(); },
+  });
+  msCat = new MultiSelect({
+    container: document.getElementById('ms-cat'),
+    label: 'Categoría',
+    onChange: vals => {
+      state.categorias = vals;
+      _refreshProductOptions();
+      loadData();
+    },
+  });
+  msProd = new MultiSelect({
+    container: document.getElementById('ms-prod'),
+    label: 'Producto',
+    onChange: vals => { state.productos = vals; loadData(); },
   });
 }
 
+function _refreshProductOptions() {
+  const catSel = state.categorias;
+  let prods;
+  if (catSel.includes('all')) {
+    prods = catalog.productos;
+  } else {
+    prods = catalog.productos.filter(p => catSel.includes(p.categoria));
+  }
+  msProd.setOptions(prods.map(p => ({ value: p.producto, text: p.producto })));
+}
+
+function populateCatalog(cat) {
+  catalog = cat;  // { anos, meses, categorias, productos }
+
+  msAno.setOptions(cat.anos.map(a      => ({ value: String(a), text: String(a) })));
+  msMes.setOptions(cat.meses.map(m     => ({ value: m, text: m.charAt(0) + m.slice(1).toLowerCase() })));
+  msCat.setOptions(cat.categorias.map(c => ({ value: c, text: c })));
+  _refreshProductOptions();
+}
+
+// Métrica
 document.getElementById('metric-ventas').addEventListener('click', () => {
   state.metric = 'ventas';
   document.getElementById('metric-ventas').classList.add('active');
@@ -407,9 +582,9 @@ function renderCatTable(cats) {
     </tr>
   `).join('');
 
-  // Populate cat filter
+  // Populate table cat filter
   const sel = document.getElementById('filter-cat');
-  const cur = sel.value;
+  const cur = state.tableCat;
   sel.innerHTML = '<option value="all">Todas las categorías</option>';
   cats.forEach(c => {
     const opt = document.createElement('option');
@@ -424,8 +599,8 @@ function renderCatTable(cats) {
 function renderTable() {
   const search   = state.search.toLowerCase();
   const filtered = allItems.filter(item => {
-    if (state.clase !== 'all' && item.clase !== state.clase) return false;
-    if (state.cat  !== 'all' && item.categoria !== state.cat) return false;
+    if (state.clase    !== 'all' && item.clase      !== state.clase)    return false;
+    if (state.tableCat !== 'all' && item.categoria  !== state.tableCat) return false;
     if (search && !item.producto.toLowerCase().includes(search) &&
         !item.categoria.toLowerCase().includes(search)) return false;
     return true;
@@ -476,9 +651,9 @@ document.querySelectorAll('#items-table th.sortable').forEach(th => {
     renderTable();
   });
 });
-document.getElementById('search-item').addEventListener('input',  e => { state.search = e.target.value; renderTable(); });
-document.getElementById('filter-clase').addEventListener('change', e => { state.clase  = e.target.value; renderTable(); });
-document.getElementById('filter-cat').addEventListener('change',   e => { state.cat    = e.target.value; renderTable(); });
+document.getElementById('search-item').addEventListener('input',  e => { state.search   = e.target.value; renderTable(); });
+document.getElementById('filter-clase').addEventListener('change', e => { state.clase    = e.target.value; renderTable(); });
+document.getElementById('filter-cat').addEventListener('change',   e => { state.tableCat = e.target.value; renderTable(); });
 
 // ── MATRIZ BCG ─────────────────────────────────────────────────────────────
 
@@ -652,10 +827,240 @@ function renderBCG(data) {
   }).join('');
 }
 
+// ── SEGUIMIENTO ────────────────────────────────────────────────────────────
+
+function saveSegList() {
+  localStorage.setItem(SEG_KEY, JSON.stringify(segList));
+}
+
+function renderSegChips() {
+  const container = document.getElementById('seg-chips');
+  container.innerHTML = segList.map((name, i) => `
+    <div class="seg-chip">
+      <span>${name}</span>
+      <button class="seg-chip-remove" data-idx="${i}" title="Quitar">✕</button>
+    </div>
+  `).join('');
+  container.querySelectorAll('.seg-chip-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      segList.splice(Number(btn.dataset.idx), 1);
+      saveSegList();
+      renderSegChips();
+      loadSeguimiento();
+    });
+  });
+}
+
+function initSegSearch() {
+  const input       = document.getElementById('seg-input');
+  const suggestions = document.getElementById('seg-suggestions');
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    if (!q) { suggestions.classList.remove('open'); return; }
+
+    const matches = catalog.productos
+      .filter(p => p.producto.toLowerCase().includes(q))
+      .slice(0, 12);
+
+    if (matches.length === 0) { suggestions.classList.remove('open'); return; }
+
+    suggestions.innerHTML = matches.map(p => {
+      const already = segList.includes(p.producto);
+      return `
+        <div class="seg-sug-item${already ? ' seg-sug-already' : ''}" data-prod="${p.producto}" data-cat="${p.categoria || ''}">
+          <span class="seg-sug-name">${p.producto}</span>
+          <span class="seg-sug-cat">${p.categoria || ''}</span>
+          <span class="seg-sug-add">${already ? '✓ ya agregado' : '+ Agregar'}</span>
+        </div>`;
+    }).join('');
+    suggestions.classList.add('open');
+
+    suggestions.querySelectorAll('.seg-sug-item:not(.seg-sug-already)').forEach(el => {
+      el.addEventListener('click', () => {
+        const prod = el.dataset.prod;
+        if (!segList.includes(prod)) {
+          segList.push(prod);
+          saveSegList();
+          renderSegChips();
+          loadSeguimiento();
+        }
+        input.value = '';
+        suggestions.classList.remove('open');
+      });
+    });
+  });
+
+  document.addEventListener('click', e => {
+    if (!input.contains(e.target) && !suggestions.contains(e.target)) {
+      suggestions.classList.remove('open');
+    }
+  });
+}
+
+async function loadSeguimiento() {
+  const grid    = document.getElementById('seg-grid');
+  const empty   = document.getElementById('seg-empty');
+  const combCard = document.getElementById('seg-combined-card');
+
+  if (segList.length === 0) {
+    grid.innerHTML = '';
+    combCard.style.display = 'none';
+    empty.style.display    = '';
+    return;
+  }
+
+  empty.style.display = 'none';
+  grid.innerHTML = '<p style="color:var(--muted);font-size:0.82rem;padding:8px">Cargando…</p>';
+
+  try {
+    const params = new URLSearchParams({ productos: segList.join(',') });
+    const data   = await fetch(`/api/seguimiento?${params}`).then(r => r.json());
+    if (data.error) throw new Error(data.error);
+
+    renderSegCards(data);
+    renderSegCombined(data);
+    combCard.style.display = segList.length > 1 ? '' : 'none';
+  } catch (err) {
+    grid.innerHTML = `<p style="color:#e03c5a;padding:8px">Error: ${err.message}</p>`;
+  }
+}
+
+function renderSegCards(data) {
+  const grid  = document.getElementById('seg-grid');
+  const isV   = state.metric === 'ventas';
+  const prods = Object.entries(data.productos);
+
+  if (prods.length === 0) {
+    grid.innerHTML = '<p style="color:var(--muted);font-size:0.82rem;padding:8px">Sin datos para los productos seleccionados.</p>';
+    return;
+  }
+
+  // Destruir sparkline charts anteriores
+  Object.keys(charts).filter(k => k.startsWith('seg-spark-')).forEach(k => {
+    charts[k].destroy(); delete charts[k];
+  });
+
+  grid.innerHTML = prods.map(([prod, d], i) => {
+    const color = SEG_PALETTE[i % SEG_PALETTE.length];
+    const trend = d.trendVentas;
+    let trendClass = 'flat', trendIcon = '→', trendTxt = 'Sin comparación';
+    if (trend !== null) {
+      if (trend > 1)       { trendClass = 'up';   trendIcon = '↑'; trendTxt = `+${trend.toFixed(1)}%`; }
+      else if (trend < -1) { trendClass = 'down'; trendIcon = '↓'; trendTxt = `${trend.toFixed(1)}%`; }
+      else                  { trendTxt = 'Estable'; }
+    }
+    return `
+      <div class="seg-card">
+        <div class="seg-card-header">
+          <div>
+            <div class="seg-card-name">${prod}</div>
+          </div>
+          <div class="seg-card-badge" style="background:${color}"></div>
+        </div>
+        <div class="seg-kpis">
+          <div class="seg-kpi">
+            <span class="seg-kpi-label">Ventas totales</span>
+            <span class="seg-kpi-val">${fmt.pesos(d.totalVentas)}</span>
+          </div>
+          <div class="seg-kpi">
+            <span class="seg-kpi-label">Unidades</span>
+            <span class="seg-kpi-val">${fmt.num(d.totalCantidad)}</span>
+          </div>
+          ${d.precioPromedio ? `<div class="seg-kpi">
+            <span class="seg-kpi-label">Precio prom.</span>
+            <span class="seg-kpi-val">${fmt.pesosFull(d.precioPromedio)}</span>
+          </div>` : ''}
+        </div>
+        <div class="seg-trend ${trendClass}">${trendIcon} ${trendTxt} <span style="font-weight:400;opacity:0.7;font-size:0.68rem">vs 3m ant.</span></div>
+        <div class="seg-sparkline"><canvas id="seg-spark-${i}"></canvas></div>
+      </div>`;
+  }).join('');
+
+  // Dibujar sparklines
+  prods.forEach(([prod, d], i) => {
+    const color  = SEG_PALETTE[i % SEG_PALETTE.length];
+    const values = isV ? d.ventas : d.cantidad;
+    const ctx    = document.getElementById(`seg-spark-${i}`);
+    if (!ctx) return;
+    charts[`seg-spark-${i}`] = new Chart(ctx.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: data.labels,
+        datasets: [{
+          data: values, borderColor: color,
+          backgroundColor: color + '18',
+          borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: {
+          ...CHART_DEFAULTS.tooltip,
+          callbacks: { label: ctx => isV ? ` ${fmt.pesos(ctx.parsed.y)}` : ` ${fmt.num(ctx.parsed.y)} uds` },
+        }},
+        scales: {
+          x: { display: false },
+          y: { display: false },
+        },
+      },
+    });
+  });
+}
+
+function renderSegCombined(data) {
+  const isV    = state.metric === 'ventas';
+  const prods  = Object.entries(data.productos);
+  const datasets = prods.map(([prod, d], i) => ({
+    label: prod,
+    data:  isV ? d.ventas : d.cantidad,
+    borderColor:     SEG_PALETTE[i % SEG_PALETTE.length],
+    backgroundColor: SEG_PALETTE[i % SEG_PALETTE.length] + '15',
+    borderWidth: 2, tension: 0.35, pointRadius: 3, fill: false,
+  }));
+
+  if (charts['chart-seguimiento']) {
+    charts['chart-seguimiento'].destroy();
+    delete charts['chart-seguimiento'];
+  }
+  if (datasets.length === 0) return;
+
+  charts['chart-seguimiento'] = new Chart(
+    document.getElementById('chart-seguimiento').getContext('2d'),
+    {
+      type: 'line',
+      data: { labels: data.labels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: CHART_DEFAULTS.legend('bottom'),
+          tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
+            label: ctx => isV
+              ? ` ${ctx.dataset.label}: ${fmt.pesosFull(ctx.parsed.y)}`
+              : ` ${ctx.dataset.label}: ${fmt.num(ctx.parsed.y)} uds`,
+          }},
+        },
+        scales: {
+          x: CHART_DEFAULTS.scaleX,
+          y: { ...CHART_DEFAULTS.scaleY, ticks: { color: '#7a7060',
+            callback: v => isV ? '$'+(v>=1e6?(v/1e6).toFixed(1)+'M':(v/1e3).toFixed(0)+'k') : fmt.num(v) } },
+        },
+      },
+    }
+  );
+}
+
 // ── Render completo ────────────────────────────────────────────────────────
 
 function renderAll(data) {
   rawData = data;
+
+  // Catálogo (solo la primera vez o en refresh total)
+  if (!state._catalogReady && data.catalog) {
+    populateCatalog(data.catalog);
+    state._catalogReady = true;
+  }
 
   // Dashboard
   renderSummary(data.summary);
@@ -689,14 +1094,14 @@ function renderAll(data) {
 async function loadData() {
   document.getElementById('btn-refresh').classList.add('spinning');
   try {
-    const params = new URLSearchParams({ ano: state.ano, metric: state.metric });
-    const data   = await fetch(`/api/carta?${params}`).then(r => r.json());
-    if (data.error) throw new Error(data.error);
+    const params = new URLSearchParams({ metric: state.metric });
+    if (!state.anos.includes('all'))       params.set('anos',       state.anos.join(','));
+    if (!state.meses.includes('all'))      params.set('meses',      state.meses.join(','));
+    if (!state.categorias.includes('all')) params.set('categorias', state.categorias.join(','));
+    if (!state.productos.includes('all'))  params.set('productos',  state.productos.join(','));
 
-    if (!state._anosLoaded && data.summary?.años?.length) {
-      buildAnoChips(data.summary.años);
-      state._anosLoaded = true;
-    }
+    const data = await fetch(`/api/carta?${params}`).then(r => r.json());
+    if (data.error) throw new Error(data.error);
     renderAll(data);
   } catch (err) {
     console.error(err);
@@ -709,8 +1114,19 @@ async function loadData() {
 document.getElementById('btn-refresh').addEventListener('click', async () => {
   await fetch('/api/refresh', { method: 'POST' });
   showToast('Recargando datos...');
-  state._anosLoaded = false;
+  state._catalogReady = false;
   loadData();
 });
 
+// Cuando el usuario navega a Seguimiento, recargar si hay productos
+document.querySelectorAll('.nav-item').forEach(item => {
+  if (item.dataset.section === 'seguimiento') {
+    item.addEventListener('click', () => { if (segList.length > 0) loadSeguimiento(); }, { capture: true });
+  }
+});
+
+// Iniciar
+initFilters();
+renderSegChips();
+initSegSearch();
 loadData();

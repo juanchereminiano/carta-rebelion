@@ -13,10 +13,23 @@ const CAT_COLORS = [
 ];
 
 // ── Filtro ─────────────────────────────────────────────────────────────────────
-function filterRecords(records, { ano, mes } = {}) {
+// Soporta parámetros simples (ano/mes string) y arrays (anos/meses/categorias/productos)
+function filterRecords(records, filters = {}) {
+  const { anos, meses, categorias, productos, ano, mes } = filters;
+
+  // Normalizar a arrays (null = sin filtro activo)
+  const anosArr = anos && !anos.includes('all') ? anos.map(String)
+                : (ano && ano !== 'all' ? [String(ano)] : null);
+  const mesesArr = meses && !meses.includes('all') ? meses.map(m => m.toUpperCase())
+                 : (mes && mes !== 'all' ? [mes.toUpperCase()] : null);
+  const catArr  = categorias && !categorias.includes('all') ? categorias : null;
+  const prodArr = productos  && !productos.includes('all')  ? productos  : null;
+
   return records.filter(r => {
-    if (ano && ano !== 'all' && String(r.ano) !== String(ano)) return false;
-    if (mes && mes !== 'all' && r.mes !== mes.toUpperCase())   return false;
+    if (anosArr  && !anosArr.includes(String(r.ano)))  return false;
+    if (mesesArr && !mesesArr.includes(r.mes))         return false;
+    if (catArr   && !catArr.includes(r.categoria))     return false;
+    if (prodArr  && !prodArr.includes(r.producto))     return false;
     return true;
   });
 }
@@ -235,6 +248,54 @@ function buildBCGData(records) {
   });
 }
 
+// ── Evolución por producto (para Seguimiento) ──────────────────────────────────
+function buildProductEvolucion(records, productos = []) {
+  const prodSet  = new Set(productos.filter(p => p && p !== 'all'));
+  const filtered = prodSet.size > 0 ? records.filter(r => prodSet.has(r.producto)) : records;
+
+  // Agrupar por producto + clave temporal
+  const byProd  = {};
+  const timeMap = {}; // tKey → { ano, mes }
+
+  for (const r of filtered) {
+    if (!r.producto || !r.ano || !r.mes) continue;
+    const tKey = `${r.ano}-${String(MES_ORDER.indexOf(r.mes)).padStart(2, '0')}`;
+    timeMap[tKey] = { ano: r.ano, mes: r.mes };
+    if (!byProd[r.producto]) byProd[r.producto] = {};
+    if (!byProd[r.producto][tKey]) byProd[r.producto][tKey] = { ventas: 0, cantidad: 0 };
+    byProd[r.producto][tKey].ventas   += r.dinero || 0;
+    byProd[r.producto][tKey].cantidad += r.cant   || 0;
+  }
+
+  const allKeys = Object.keys(timeMap).sort();
+  const labels  = allKeys.map(k => {
+    const { ano, mes } = timeMap[k];
+    return `${mes.slice(0, 3)} ${ano}`;
+  });
+
+  const resultado = {};
+  for (const [prod, byKey] of Object.entries(byProd)) {
+    const ventasArr   = allKeys.map(k => byKey[k]?.ventas   || 0);
+    const cantidadArr = allKeys.map(k => byKey[k]?.cantidad || 0);
+    const totalVentas   = ventasArr.reduce((s, v) => s + v, 0);
+    const totalCantidad = cantidadArr.reduce((s, v) => s + v, 0);
+
+    // Tendencia: últimos 3 meses vs previos 3
+    const last3 = ventasArr.slice(-3).reduce((s, v) => s + v, 0);
+    const prev3 = ventasArr.slice(-6, -3).reduce((s, v) => s + v, 0);
+    const trendVentas = prev3 > 0 ? ((last3 - prev3) / prev3) * 100 : null;
+
+    resultado[prod] = {
+      ventas: ventasArr, cantidad: cantidadArr,
+      totalVentas, totalCantidad,
+      trendVentas,
+      precioPromedio: totalCantidad > 0 ? Math.round(totalVentas / totalCantidad) : null,
+    };
+  }
+
+  return { labels, productos: resultado };
+}
+
 module.exports = {
   filterRecords,
   buildSummary,
@@ -243,5 +304,6 @@ module.exports = {
   buildEvolucion,
   buildTopItems,
   buildBCGData,
+  buildProductEvolucion,
   MES_ORDER,
 };

@@ -40,6 +40,10 @@
       <span class="nav-icon">⊞</span>
       <span class="nav-label">Matriz BCG</span>
     </a>
+    <a class="nav-item" data-section="seguimiento">
+      <span class="nav-icon">⌕</span>
+      <span class="nav-label">Seguimiento</span>
+    </a>
     <a class="nav-item nav-item-disabled" data-section="cmv">
       <span class="nav-icon">$</span>
       <span class="nav-label">CMV <span class="soon-badge">Pronto</span></span>
@@ -64,13 +68,15 @@
       <span id="section-title" class="section-title">Dashboard</span>
     </div>
     <div class="topbar-right">
-      <!-- Filtros globales -->
-      <div class="filter-chips" id="filter-ano">
-        <button class="chip active" data-value="all">Todos</button>
-      </div>
-      <div class="filter-chips">
-        <button class="chip active" id="metric-ventas" data-metric="ventas">$ Ventas</button>
-        <button class="chip" id="metric-cantidad" data-metric="cantidad">Cantidad</button>
+      <!-- Multi-select filters — populated by JS -->
+      <div id="ms-ano"  class="ms-wrap"></div>
+      <div id="ms-mes"  class="ms-wrap"></div>
+      <div id="ms-cat"  class="ms-wrap"></div>
+      <div id="ms-prod" class="ms-wrap"></div>
+      <!-- Métrica -->
+      <div class="filter-chips metric-toggle">
+        <button class="chip active" id="metric-ventas"   data-metric="ventas">$ Ventas</button>
+        <button class="chip"        id="metric-cantidad" data-metric="cantidad">Cantidades</button>
       </div>
       <button id="btn-refresh" class="btn-refresh" title="Actualizar">&#8635;</button>
     </div>
@@ -226,6 +232,45 @@
         </div>
       </div>
       <div id="bcg-cards" class="bcg-grid"></div>
+    </section>
+
+    <!-- SEGUIMIENTO ──────────────────────────────────────────────────── -->
+    <section id="section-seguimiento" class="page-section">
+
+      <!-- Buscador para agregar productos -->
+      <div class="card seg-search-card">
+        <div class="card-header-row">
+          <h2>Productos en seguimiento</h2>
+          <span class="seg-hint">Buscá y sumá los que querés monitorear</span>
+        </div>
+        <div class="seg-search-row">
+          <div class="seg-search-box">
+            <input id="seg-input" class="search-input seg-input" type="text"
+              placeholder="Buscar producto para agregar..." autocomplete="off" />
+            <div id="seg-suggestions" class="seg-suggestions"></div>
+          </div>
+        </div>
+        <div id="seg-chips" class="seg-chips"></div>
+      </div>
+
+      <!-- Gráfico comparativo combinado -->
+      <div class="card" id="seg-combined-card" style="display:none">
+        <h2>Evolución comparada — todos los períodos</h2>
+        <div class="chart-wrap" style="height:320px">
+          <canvas id="chart-seguimiento"></canvas>
+        </div>
+      </div>
+
+      <!-- Cards individuales por producto -->
+      <div id="seg-grid" class="seg-grid"></div>
+
+      <!-- Estado vacío -->
+      <div id="seg-empty" class="card coming-soon">
+        <div class="coming-icon">⌕</div>
+        <h2 style="color:var(--text);font-size:1.1rem;text-transform:none;letter-spacing:0;margin:0">Ningún producto en seguimiento</h2>
+        <p>Buscá un producto arriba y hacé clic para agregarlo.<br>Vas a ver su evolución, tendencia y KPIs en un solo lugar.</p>
+      </div>
+
     </section>
 
     <!-- CMV ───────────────────────────────────────────────────────────── -->

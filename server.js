@@ -13,6 +13,7 @@ const {
   buildEvolucion,
   buildTopItems,
   buildBCGData,
+  buildProductEvolucion,
 } = require('./src/cartaTransform');
 
 const app   = express();
@@ -30,12 +31,33 @@ async function getData() {
 }
 
 // Datos del tablero (con filtros opcionales)
-// Query params: ?ano=2024|all  &mes=ENERO|all  &metric=ventas|cantidad
+// Query params: ?anos=2024,2025  &meses=ENERO,FEBRERO  &categorias=C1,C2  &productos=P1  &metric=ventas|cantidad
 app.get('/api/carta', async (req, res) => {
   try {
     const { records } = await getData();
-    const { ano, mes, metric = 'ventas' } = req.query;
-    const filtered = filterRecords(records, { ano, mes });
+    const metric = req.query.metric || 'ventas';
+
+    // Parsear parámetros — soporta comma-separated arrays
+    const parse = (key, legacy) => {
+      if (req.query[key])    return req.query[key].split(',').map(s => s.trim());
+      if (req.query[legacy]) return [req.query[legacy]];
+      return ['all'];
+    };
+    const anos       = parse('anos', 'ano');
+    const meses      = parse('meses', 'mes');
+    const categorias = parse('categorias');
+    const productos  = parse('productos');
+
+    const filtered = filterRecords(records, { anos, meses, categorias, productos });
+
+    // Catálogo completo (sin filtros) para los dropdowns del cliente
+    const allRecords = records;
+    const catalog = {
+      anos:       [...new Set(allRecords.map(r => r.ano).filter(Boolean))].sort().map(String),
+      meses:      [...new Set(allRecords.map(r => r.mes).filter(Boolean))],
+      categorias: [...new Set(allRecords.map(r => r.categoria).filter(Boolean))].sort(),
+      productos:  buildTopItems(allRecords, 9999).map(i => ({ producto: i.producto, categoria: i.categoria })),
+    };
 
     res.json({
       summary:    buildSummary(filtered),
@@ -43,10 +65,23 @@ app.get('/api/carta', async (req, res) => {
       categorias: buildCategories(filtered, metric),
       evolucion:  buildEvolucion(filtered),
       topItems:   buildTopItems(filtered, 30),
-      bcgData:    buildBCGData(records),   // usa TODOS los años para calcular YoY real
+      bcgData:    buildBCGData(records),
+      catalog,
     });
   } catch (err) {
     console.error('Error /api/carta:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Seguimiento — evolución mensual por producto
+app.get('/api/seguimiento', async (req, res) => {
+  try {
+    const { records } = await getData();
+    const productos = req.query.productos ? req.query.productos.split(',').map(s => s.trim()).filter(Boolean) : [];
+    res.json(buildProductEvolucion(records, productos));
+  } catch (err) {
+    console.error('Error /api/seguimiento:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
