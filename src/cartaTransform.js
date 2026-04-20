@@ -249,13 +249,47 @@ function buildBCGData(records) {
 }
 
 // ── Evolución por producto (para Seguimiento) ──────────────────────────────────
+// records: ya filtrados por año/mes
+// productos: watchlist (array de nombres)
 function buildProductEvolucion(records, productos = []) {
-  const prodSet  = new Set(productos.filter(p => p && p !== 'all'));
+  const prodSet = new Set(productos.filter(p => p && p !== 'all'));
+
+  // ── 1. Ranking global — sobre TODOS los productos del período ────────────
+  const globalTotals = {};  // producto → { ventas, cantidad, categoria }
+  for (const r of records) {
+    if (!r.producto) continue;
+    if (!globalTotals[r.producto])
+      globalTotals[r.producto] = { ventas: 0, cantidad: 0, categoria: r.categoria || '—' };
+    globalTotals[r.producto].ventas   += r.dinero || 0;
+    globalTotals[r.producto].cantidad += r.cant   || 0;
+  }
+
+  // Ordenar por ventas para asignar rank
+  const globalRanking = Object.entries(globalTotals)
+    .sort((a, b) => b[1].ventas - a[1].ventas);
+
+  const totalVentasGlobal   = globalRanking.reduce((s, [, d]) => s + d.ventas,   0);
+  const totalCantidadGlobal = globalRanking.reduce((s, [, d]) => s + d.cantidad, 0);
+  const totalProductos      = globalRanking.length;
+
+  // Mapa producto → { rankVentas, rankCantidad, pctVentas, pctCantidad }
+  const rankMap = {};
+  globalRanking.forEach(([prod, d], idx) => {
+    rankMap[prod] = {
+      rankVentas:   idx + 1,
+      pctVentas:    totalVentasGlobal   > 0 ? (d.ventas   / totalVentasGlobal)   * 100 : 0,
+      pctCantidad:  totalCantidadGlobal > 0 ? (d.cantidad / totalCantidadGlobal) * 100 : 0,
+    };
+  });
+  // Ranking por cantidad (separado)
+  const byQty = Object.entries(globalTotals).sort((a, b) => b[1].cantidad - a[1].cantidad);
+  byQty.forEach(([prod], idx) => { if (rankMap[prod]) rankMap[prod].rankCantidad = idx + 1; });
+
+  // ── 2. Serie temporal — solo para los productos del watchlist ────────────
   const filtered = prodSet.size > 0 ? records.filter(r => prodSet.has(r.producto)) : records;
 
-  // Agrupar por producto + clave temporal
   const byProd  = {};
-  const timeMap = {}; // tKey → { ano, mes }
+  const timeMap = {};
 
   for (const r of filtered) {
     if (!r.producto || !r.ano || !r.mes) continue;
@@ -281,25 +315,30 @@ function buildProductEvolucion(records, productos = []) {
     const totalCantidad = cantidadArr.reduce((s, v) => s + v, 0);
 
     // Tendencia: últimos 3 meses vs previos 3
-    const last3 = ventasArr.slice(-3).reduce((s, v) => s + v, 0);
-    const prev3 = ventasArr.slice(-6, -3).reduce((s, v) => s + v, 0);
-    const trendVentas = prev3 > 0 ? ((last3 - prev3) / prev3) * 100 : null;
-
-    // Tendencia cantidad
+    const last3  = ventasArr.slice(-3).reduce((s, v) => s + v, 0);
+    const prev3  = ventasArr.slice(-6, -3).reduce((s, v) => s + v, 0);
     const last3c = cantidadArr.slice(-3).reduce((s, v) => s + v, 0);
     const prev3c = cantidadArr.slice(-6, -3).reduce((s, v) => s + v, 0);
-    const trendCantidad = prev3c > 0 ? ((last3c - prev3c) / prev3c) * 100 : null;
+
+    const rk = rankMap[prod] || { rankVentas: null, rankCantidad: null, pctVentas: 0, pctCantidad: 0 };
 
     resultado[prod] = {
       ventas: ventasArr, cantidad: cantidadArr,
       totalVentas, totalCantidad,
-      trendVentas, trendCantidad,
-      categoria: byKey._categoria || '—',
+      trendVentas:    prev3  > 0 ? ((last3  - prev3)  / prev3)  * 100 : null,
+      trendCantidad:  prev3c > 0 ? ((last3c - prev3c) / prev3c) * 100 : null,
+      categoria:      byKey._categoria || '—',
       precioPromedio: totalCantidad > 0 ? Math.round(totalVentas / totalCantidad) : null,
+      // Ranking en el período filtrado
+      rankVentas:    rk.rankVentas,
+      rankCantidad:  rk.rankCantidad,
+      pctVentas:     Math.round(rk.pctVentas   * 10) / 10,
+      pctCantidad:   Math.round(rk.pctCantidad * 10) / 10,
+      totalProductos,
     };
   }
 
-  return { labels, productos: resultado };
+  return { labels, productos: resultado, totalProductos };
 }
 
 module.exports = {

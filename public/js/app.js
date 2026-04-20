@@ -1103,6 +1103,18 @@ function renderSegCards(data) {
     const trendBlock = _segTrendBlock(trend, 'vs 3m ant.');
     const cat = d.categoria && d.categoria !== '—' ? d.categoria : null;
 
+    // Ranking y participación según métrica activa
+    const rank    = isV ? d.rankVentas    : d.rankCantidad;
+    const pct     = isV ? d.pctVentas     : d.pctCantidad;
+    const total   = d.totalProductos || '?';
+
+    // Barra de participación (ancho = pct, max visual = 30% → 100% de la barra)
+    const barW = Math.min(100, pct > 0 ? (pct / 30) * 100 : 0);
+
+    // Color del ranking: top 3 dorado, top 10 azul, resto gris
+    const rankColor = rank <= 3 ? '#c8a84b' : rank <= 10 ? '#3b82f6' : 'var(--muted)';
+    const rankLabel = rank ? `#${rank} de ${total}` : '—';
+
     return `
       <div class="seg-card">
         <div class="seg-card-header">
@@ -1110,8 +1122,19 @@ function renderSegCards(data) {
             <div class="seg-card-name">${prod}</div>
             ${cat ? `<div class="seg-card-cat"><span class="cat-tag">${cat}</span></div>` : ''}
           </div>
-          <div class="seg-card-badge" style="background:${color}"></div>
+          <div class="seg-rank-badge" style="color:${rankColor}" title="Posición en el ranking del período">
+            <span class="seg-rank-num">${rankLabel}</span>
+          </div>
         </div>
+
+        <!-- Participación -->
+        <div class="seg-share-row">
+          <div class="seg-share-bar-track">
+            <div class="seg-share-bar-fill" style="width:${barW}%;background:${color}"></div>
+          </div>
+          <span class="seg-share-label">${pct > 0 ? pct.toFixed(1) + '%' : '—'} del total</span>
+        </div>
+
         <div class="seg-kpis">
           <div class="seg-kpi">
             <span class="seg-kpi-label">Ventas</span>
