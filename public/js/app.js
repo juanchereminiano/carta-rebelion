@@ -754,10 +754,59 @@ function renderTable() {
     return dir * ((va ?? 0) - (vb ?? 0));
   });
 
-  const tbody = document.getElementById('items-tbody');
-  tbody.innerHTML = sorted.length === 0
-    ? `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted)">Sin resultados</td></tr>`
-    : sorted.map((item, idx) => `
+  const tbody   = document.getElementById('items-tbody');
+  const isMobile = window.innerWidth <= 640;
+
+  if (sorted.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted)">Sin resultados</td></tr>`;
+    return;
+  }
+
+  if (isMobile) {
+    // ── Vista card en mobile ──────────────────────────────────────────────
+    tbody.innerHTML = sorted.map((item, idx) => {
+      const acumColor = item.pctCum <= 70 ? '#38d9a9' : item.pctCum <= 90 ? '#f5a623' : '#e03c5a';
+      return `
+        <tr class="item-row-card">
+          <td colspan="9">
+            <div class="item-card">
+              <div class="item-card-top">
+                <div class="item-card-rank">${idx + 1}</div>
+                <div class="item-card-name">${item.producto}</div>
+                <span class="badge-inline ${item.clase.toLowerCase()}">${item.clase}</span>
+              </div>
+              <div class="item-card-cat"><span class="cat-tag">${item.categoria.replace(/^\d+\s+/, '')}</span></div>
+              <div class="item-card-stats">
+                <div class="item-card-stat">
+                  <span class="item-stat-label">Ventas</span>
+                  <span class="item-stat-val">${fmt.pesos(item.ventas)}</span>
+                </div>
+                <div class="item-card-stat">
+                  <span class="item-stat-label">Unidades</span>
+                  <span class="item-stat-val">${fmt.num(item.cantidad)}</span>
+                </div>
+                <div class="item-card-stat">
+                  <span class="item-stat-label">Precio</span>
+                  <span class="item-stat-val">${fmt.pesos(item.precioPromedio)}</span>
+                </div>
+                <div class="item-card-stat">
+                  <span class="item-stat-label">% total</span>
+                  <span class="item-stat-val">${fmt.pct(item.pct)}</span>
+                </div>
+              </div>
+              <div class="item-card-bar">
+                <div class="item-bar-track">
+                  <div class="item-bar-fill" style="width:${Math.min(item.pctCum,100)}%;background:${acumColor}"></div>
+                </div>
+                <span class="item-bar-label">Acum. ${fmt.pct(item.pctCum)}</span>
+              </div>
+            </div>
+          </td>
+        </tr>`;
+    }).join('');
+  } else {
+    // ── Vista tabla normal ────────────────────────────────────────────────
+    tbody.innerHTML = sorted.map((item, idx) => `
       <tr>
         <td style="color:var(--muted);font-size:0.75rem">${idx+1}</td>
         <td style="text-align:left;color:var(--text)">${item.producto}</td>
@@ -777,6 +826,7 @@ function renderTable() {
         <td><span class="badge-inline ${item.clase.toLowerCase()}">${item.clase}</span></td>
       </tr>
     `).join('');
+  }
 
   document.querySelectorAll('#items-table th.sortable').forEach(th => {
     th.classList.remove('sort-asc','sort-desc');
@@ -794,6 +844,13 @@ document.querySelectorAll('#items-table th.sortable').forEach(th => {
 document.getElementById('search-item').addEventListener('input',  e => { state.search   = e.target.value; renderTable(); });
 document.getElementById('filter-clase').addEventListener('change', e => { state.clase    = e.target.value; renderTable(); });
 document.getElementById('filter-cat').addEventListener('change',   e => { state.tableCat = e.target.value; renderTable(); });
+
+// Re-render tabla si cambia orientación/tamaño (card ↔ tabla)
+let _lastMobileTable = window.innerWidth <= 640;
+window.addEventListener('resize', () => {
+  const nowMobile = window.innerWidth <= 640;
+  if (nowMobile !== _lastMobileTable) { _lastMobileTable = nowMobile; renderTable(); }
+});
 
 // ── MATRIZ BCG ─────────────────────────────────────────────────────────────
 

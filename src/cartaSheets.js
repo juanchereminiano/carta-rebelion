@@ -39,6 +39,20 @@ function normalize(str) {
   return (str || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
+// Decodifica entidades HTML comunes que Google Sheets puede insertar
+// Ej: "CHICKEN &amp; ROLL" → "CHICKEN & ROLL"
+function decodeEntities(str) {
+  if (!str) return str;
+  return str
+    .replace(/&amp;/gi,  '&')
+    .replace(/&lt;/gi,   '<')
+    .replace(/&gt;/gi,   '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi,  "'")
+    .replace(/&nbsp;/gi, ' ')
+    .trim();
+}
+
 // Meses canónicos y sus variantes/typos conocidos
 const MES_CANONICAL = [
   'ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO',
@@ -122,9 +136,9 @@ function parseRows(rows) {
 
     const ano      = parseValue(row[idxAno] || '');
     const mes      = normalizeMes(row[idxMes] || '');
-    const categoria = (idxCat >= 0 ? row[idxCat] : '').trim();
+    const categoria = decodeEntities((idxCat >= 0 ? row[idxCat] : '').trim());
     const codigo   = idxCod >= 0 ? parseValue(row[idxCod] || '') : null;
-    const producto = (idxProd >= 0 ? row[idxProd] : '').trim();
+    const producto = decodeEntities((idxProd >= 0 ? row[idxProd] : '').trim());
     const cant     = idxCant >= 0 ? parseValue(row[idxCant] || '') : null;
     const dinero   = idxDin >= 0 ? parseValue(row[idxDin] || '') : null;
     const precioPromedio = idxPrecio >= 0 ? parseValue(row[idxPrecio] || '') : null;
