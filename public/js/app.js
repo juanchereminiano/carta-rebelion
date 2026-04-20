@@ -191,7 +191,19 @@ class MultiSelect {
     document.querySelectorAll('.ms-panel.open').forEach(p => p.classList.remove('open'));
     if (!isOpen) {
       this.panel.classList.add('open');
-      // Foco al buscador al abrir
+      // En mobile: posicionar el panel fijo anclado debajo del botón
+      if (window.innerWidth <= 960) {
+        const rect = this.btn.getBoundingClientRect();
+        this.panel.style.top  = (rect.bottom + 6) + 'px';
+        this.panel.style.left = '10px';
+        this.panel.style.right = '10px';
+        this.panel.style.width = 'auto';
+      } else {
+        this.panel.style.top  = '';
+        this.panel.style.left = '';
+        this.panel.style.right = '';
+        this.panel.style.width = '';
+      }
       if (this._searchInput) setTimeout(() => this._searchInput.focus(), 50);
     }
   }
@@ -201,6 +213,45 @@ class MultiSelect {
 
 // Instancias
 let msAno, msMes, msCat, msProd;
+
+// ── Filter panel toggle (mobile/tablet) ────────────────────────────────────
+function initFilterToggle() {
+  const btn   = document.getElementById('btn-filter-toggle');
+  const panel = document.getElementById('filter-panel');
+  if (!btn || !panel) return;
+
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const isOpen = panel.classList.contains('open');
+    panel.classList.toggle('open', !isOpen);
+    btn.classList.toggle('active', !isOpen);
+  });
+
+  // Cerrar el panel al hacer click fuera
+  document.addEventListener('click', e => {
+    if (!panel.contains(e.target) && !btn.contains(e.target)) {
+      panel.classList.remove('open');
+      btn.classList.remove('active');
+    }
+  });
+}
+
+// Actualiza el badge de filtros activos en el botón
+function updateFilterBadge() {
+  const badge = document.getElementById('filter-count-badge');
+  if (!badge) return;
+  let count = 0;
+  if (!state.anos.includes('all'))       count++;
+  if (!state.meses.includes('all'))      count++;
+  if (!state.categorias.includes('all')) count++;
+  if (!state.productos.includes('all'))  count++;
+  if (count > 0) {
+    badge.textContent = count;
+    badge.style.display = 'inline-flex';
+  } else {
+    badge.style.display = 'none';
+  }
+}
 
 // ── Formateo ───────────────────────────────────────────────────────────────
 const fmt = {
@@ -320,12 +371,12 @@ function initFilters() {
   msAno = new MultiSelect({
     container: document.getElementById('ms-ano'),
     label: 'Año',
-    onChange: vals => { state.anos = vals; loadData(); },
+    onChange: vals => { state.anos = vals; updateFilterBadge(); loadData(); },
   });
   msMes = new MultiSelect({
     container: document.getElementById('ms-mes'),
     label: 'Mes',
-    onChange: vals => { state.meses = vals; loadData(); },
+    onChange: vals => { state.meses = vals; updateFilterBadge(); loadData(); },
   });
   msCat = new MultiSelect({
     container: document.getElementById('ms-cat'),
@@ -334,6 +385,7 @@ function initFilters() {
     onChange: vals => {
       state.categorias = vals;
       _refreshProductOptions();
+      updateFilterBadge();
       loadData();
     },
   });
@@ -341,7 +393,7 @@ function initFilters() {
     container: document.getElementById('ms-prod'),
     label: 'Producto',
     searchable: true,
-    onChange: vals => { state.productos = vals; loadData(); },
+    onChange: vals => { state.productos = vals; updateFilterBadge(); loadData(); },
   });
 }
 
@@ -1367,6 +1419,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
 });
 
 // Iniciar
+initFilterToggle();
 initFilters();
 initSegFilters();
 renderSegChips();

@@ -68,16 +68,11 @@
       <span id="section-title" class="section-title">Dashboard</span>
     </div>
     <div class="topbar-right">
-      <!-- Multi-select filters — populated by JS -->
-      <div id="ms-ano"  class="ms-wrap"></div>
-      <div id="ms-mes"  class="ms-wrap"></div>
-      <div id="ms-cat"  class="ms-wrap"></div>
-      <div id="ms-prod" class="ms-wrap"></div>
-      <!-- Métrica -->
-      <div class="filter-chips metric-toggle">
-        <button class="chip active" id="metric-ventas"   data-metric="ventas">$ Ventas</button>
-        <button class="chip"        id="metric-cantidad" data-metric="cantidad">Cantidades</button>
-      </div>
+      <button id="btn-filter-toggle" class="btn-filter-toggle" title="Mostrar filtros">
+        <span>&#9878;</span>
+        <span class="btn-filter-label">Filtros</span>
+        <span id="filter-count-badge" class="filter-count-badge" style="display:none"></span>
+      </button>
       <div class="refresh-wrap">
         <button id="btn-refresh" class="btn-refresh" title="Forzar actualización desde Google Sheets">
           <span class="refresh-icon">&#8635;</span>
@@ -87,6 +82,18 @@
       </div>
     </div>
   </header>
+
+  <!-- Filter panel — sticky on desktop, collapsible on mobile/tablet -->
+  <div id="filter-panel" class="filter-panel">
+    <div id="ms-ano"  class="ms-wrap"></div>
+    <div id="ms-mes"  class="ms-wrap"></div>
+    <div id="ms-cat"  class="ms-wrap"></div>
+    <div id="ms-prod" class="ms-wrap"></div>
+    <div class="filter-chips metric-toggle">
+      <button class="chip active" id="metric-ventas"   data-metric="ventas">$ Ventas</button>
+      <button class="chip"        id="metric-cantidad" data-metric="cantidad">Cantidades</button>
+    </div>
+  </div>
 
   <!-- ── Secciones ────────────────────────────────────────────────────── -->
   <main class="app-main">
@@ -132,13 +139,13 @@
     <section id="section-evolucion" class="page-section">
       <div class="card">
         <h2>Evolución mensual de ventas</h2>
-        <div class="chart-wrap" style="height:380px">
+        <div class="chart-wrap" style="height:360px">
           <canvas id="chart-evolucion"></canvas>
         </div>
       </div>
       <div class="card" style="margin-top:0">
         <h2>Evolución por categoría — Top 6</h2>
-        <div class="chart-wrap" style="height:380px">
+        <div class="chart-wrap" style="height:360px">
           <canvas id="chart-evolucion-cat"></canvas>
         </div>
       </div>
@@ -233,7 +240,7 @@
             <span class="bcg-dot" style="background:#3d5a78"></span>Perro
           </div>
         </div>
-        <div class="chart-wrap" style="height:480px">
+        <div class="chart-wrap chart-bcg-wrap">
           <canvas id="chart-bcg"></canvas>
         </div>
       </div>
