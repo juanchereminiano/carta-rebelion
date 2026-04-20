@@ -31,17 +31,21 @@ const SEG_PALETTE = ['#3b82f6','#c8a84b','#22c55e','#f43f5e','#a855f7','#14b8a6'
 
 // ── Clase MultiSelect ──────────────────────────────────────────────────────
 class MultiSelect {
-  constructor({ container, label, onChange }) {
-    this.container = container;
-    this.label     = label;
-    this.onChange  = onChange;
-    this.options   = [];   // [{value, text}]
-    this.selected  = new Set(['all']);
+  // searchable: si true, muestra un campo de búsqueda dentro del panel
+  constructor({ container, label, onChange, searchable = false }) {
+    this.container  = container;
+    this.label      = label;
+    this.onChange   = onChange;
+    this.searchable = searchable;
+    this.options    = [];   // [{value, text}]
+    this.selected   = new Set(['all']);
+    this._query     = '';   // texto del buscador interno
     this._build();
   }
 
   _build() {
     this.container.innerHTML = '';
+
     this.btn = document.createElement('button');
     this.btn.className = 'ms-btn';
     this.btn.innerHTML =
@@ -52,45 +56,81 @@ class MultiSelect {
     this.panel = document.createElement('div');
     this.panel.className = 'ms-panel';
 
+    // Buscador interno (solo si searchable)
+    if (this.searchable) {
+      this._searchInput = document.createElement('input');
+      this._searchInput.type        = 'text';
+      this._searchInput.placeholder = 'Buscar…';
+      this._searchInput.className   = 'ms-search';
+      this._searchInput.autocomplete = 'off';
+      this._searchInput.addEventListener('input', () => {
+        this._query = this._searchInput.value.trim().toLowerCase();
+        this._renderList();
+      });
+      // Evitar que el keydown cierre el panel
+      this._searchInput.addEventListener('keydown', e => e.stopPropagation());
+      this.panel.appendChild(this._searchInput);
+
+      const sep = document.createElement('div');
+      sep.className = 'ms-divider';
+      this.panel.appendChild(sep);
+    }
+
+    // Contenedor de opciones (scrollable)
+    this._listEl = document.createElement('div');
+    this._listEl.className = 'ms-list';
+    this.panel.appendChild(this._listEl);
+
     this.container.appendChild(this.btn);
     this.container.appendChild(this.panel);
 
     this.btn.addEventListener('click', e => { e.stopPropagation(); this._toggle(); });
     this.panel.addEventListener('click', e => e.stopPropagation());
-    document.addEventListener('click', () => this._close(), { capture: false });
+    document.addEventListener('click', () => this._close());
   }
 
   setOptions(options) {
     this.options = options;
-    // Quitar valores seleccionados que ya no existen
+    // Quitar seleccionados que ya no existen
     const valid = new Set(options.map(o => o.value));
     for (const v of this.selected) {
       if (v !== 'all' && !valid.has(v)) this.selected.delete(v);
     }
     if (this.selected.size === 0) this.selected.add('all');
-    this._renderPanel();
+    this._query = '';
+    if (this._searchInput) this._searchInput.value = '';
+    this._renderList();
     this._updateBtn();
   }
 
-  _renderPanel() {
-    this.panel.innerHTML = '';
-    if (this.options.length === 0) {
-      this.panel.innerHTML = '<div class="ms-empty">Sin opciones</div>';
+  _renderList() {
+    this._listEl.innerHTML = '';
+    const q = this._query;
+
+    // Filtrar opciones según búsqueda
+    const visible = q
+      ? this.options.filter(o => o.text.toLowerCase().includes(q))
+      : this.options;
+
+    // "Todos" — solo si no hay búsqueda activa
+    if (!q) {
+      this._listEl.appendChild(this._makeOption('all', 'Todos', true));
+      if (visible.length > 0) {
+        const d = document.createElement('div');
+        d.className = 'ms-divider';
+        this._listEl.appendChild(d);
+      }
+    }
+
+    if (visible.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'ms-empty';
+      empty.textContent = 'Sin resultados';
+      this._listEl.appendChild(empty);
       return;
     }
 
-    // Opción "Todos"
-    this.panel.appendChild(this._makeOption('all', 'Todos', true));
-
-    if (this.options.length > 0) {
-      const d = document.createElement('div');
-      d.className = 'ms-divider';
-      this.panel.appendChild(d);
-    }
-
-    this.options.forEach(opt => {
-      this.panel.appendChild(this._makeOption(opt.value, opt.text, false));
-    });
+    visible.forEach(opt => this._listEl.appendChild(this._makeOption(opt.value, opt.text, false)));
   }
 
   _makeOption(value, text, isAll) {
@@ -105,15 +145,14 @@ class MultiSelect {
     cb.addEventListener('change', () => {
       if (value === 'all') {
         this.selected.clear();
-        if (cb.checked) this.selected.add('all');
-        else            this.selected.add('all'); // siempre algo seleccionado
+        this.selected.add('all');
       } else {
         this.selected.delete('all');
         if (cb.checked) this.selected.add(value);
         else            this.selected.delete(value);
         if (this.selected.size === 0) this.selected.add('all');
       }
-      this._renderPanel(); // re-render to sync checkboxes
+      this._renderList();
       this._updateBtn();
       this.onChange([...this.selected]);
     });
@@ -141,14 +180,20 @@ class MultiSelect {
   reset() {
     this.selected.clear();
     this.selected.add('all');
-    this._renderPanel();
+    this._query = '';
+    if (this._searchInput) this._searchInput.value = '';
+    this._renderList();
     this._updateBtn();
   }
 
   _toggle() {
-    const open = this.panel.classList.contains('open');
+    const isOpen = this.panel.classList.contains('open');
     document.querySelectorAll('.ms-panel.open').forEach(p => p.classList.remove('open'));
-    if (!open) this.panel.classList.add('open');
+    if (!isOpen) {
+      this.panel.classList.add('open');
+      // Foco al buscador al abrir
+      if (this._searchInput) setTimeout(() => this._searchInput.focus(), 50);
+    }
   }
 
   _close() { this.panel.classList.remove('open'); }
@@ -285,6 +330,7 @@ function initFilters() {
   msCat = new MultiSelect({
     container: document.getElementById('ms-cat'),
     label: 'Categoría',
+    searchable: true,
     onChange: vals => {
       state.categorias = vals;
       _refreshProductOptions();
@@ -294,6 +340,7 @@ function initFilters() {
   msProd = new MultiSelect({
     container: document.getElementById('ms-prod'),
     label: 'Producto',
+    searchable: true,
     onChange: vals => { state.productos = vals; loadData(); },
   });
 }

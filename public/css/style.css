@@ -447,12 +447,29 @@ body {
   position: absolute; top: calc(100% + 6px); left: 0;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 10px; padding: 6px;
-  min-width: 180px; max-width: 260px;
+  min-width: 200px; max-width: 280px;
   box-shadow: 0 8px 28px rgba(0,0,0,0.12);
   z-index: 500; display: none;
-  max-height: 320px; overflow-y: auto;
+  /* sin overflow aquí — lo maneja .ms-list */
 }
 .ms-panel.open { display: block; animation: fadeIn 0.12s ease; }
+
+/* Buscador interno del panel */
+.ms-search {
+  width: 100%; padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg); color: var(--text);
+  font-size: 0.8rem; outline: none;
+  margin-bottom: 2px;
+  transition: border-color 0.15s;
+}
+.ms-search:focus { border-color: var(--accent); }
+.ms-search::placeholder { color: var(--muted); }
+
+/* Lista scrollable de opciones */
+.ms-list {
+  max-height: 240px; overflow-y: auto;
+}
 
 .ms-option {
   display: flex; align-items: center; gap: 8px;
