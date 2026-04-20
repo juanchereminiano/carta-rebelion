@@ -161,6 +161,80 @@ function buildTopItems(records, n = 30) {
   return items.slice(0, n);
 }
 
+// ── Matriz BCG — crecimiento real AñoAño por producto ─────────────────────────
+function buildBCGData(records) {
+  const años = [...new Set(records.map(r => r.ano).filter(Boolean))].sort();
+  if (años.length < 2) {
+    // Con un solo año no hay YoY; devolvemos igual usando share relativo
+    const lastYear = años[0];
+    const byProduct = {};
+    for (const r of records) {
+      if (!r.producto || !r.ano) continue;
+      if (!byProduct[r.producto]) byProduct[r.producto] = { categoria: r.categoria, ventas: 0, cantidad: 0 };
+      byProduct[r.producto].ventas   += r.dinero || 0;
+      byProduct[r.producto].cantidad += r.cant   || 0;
+    }
+    const items = Object.values(byProduct).map(d => ({ ...d, growth: null }));
+    const maxVentas = Math.max(...items.map(i => i.ventas), 1);
+    return items.map(item => {
+      const relShare = (item.ventas / maxVentas) * 100;
+      const cuadrante = relShare >= 15 ? 'Vaca' : 'Perro';
+      return { producto: item.producto || '?', categoria: item.categoria, ventas: item.ventas,
+               cantidad: item.cantidad, growth: null, relShare, cuadrante };
+    });
+  }
+
+  const lastYear = años[años.length - 1];
+  const prevYear = años[años.length - 2];
+
+  // Agrupar por producto + año
+  const byProduct = {};
+  for (const r of records) {
+    if (!r.producto || !r.ano) continue;
+    if (!byProduct[r.producto]) byProduct[r.producto] = { categoria: r.categoria || '—', byYear: {} };
+    if (!byProduct[r.producto].byYear[r.ano])
+      byProduct[r.producto].byYear[r.ano] = { ventas: 0, cantidad: 0 };
+    byProduct[r.producto].byYear[r.ano].ventas   += r.dinero || 0;
+    byProduct[r.producto].byYear[r.ano].cantidad += r.cant   || 0;
+  }
+
+  const items = [];
+  for (const [producto, data] of Object.entries(byProduct)) {
+    const curr = data.byYear[lastYear];
+    const prev = data.byYear[prevYear];
+    if (!curr || curr.ventas === 0) continue;
+    const growth = prev && prev.ventas > 0
+      ? ((curr.ventas - prev.ventas) / prev.ventas) * 100
+      : null;
+    items.push({
+      producto,
+      categoria: data.categoria,
+      ventas:    curr.ventas,
+      cantidad:  curr.cantidad,
+      growth,
+      prevVentas: prev?.ventas || 0,
+    });
+  }
+
+  const maxVentas = Math.max(...items.map(i => i.ventas), 1);
+  // Mediana de growth para centrar el eje
+  const growthsKnown = items.map(i => i.growth).filter(g => g !== null).sort((a,b)=>a-b);
+  const medianGrowth = growthsKnown.length > 0
+    ? growthsKnown[Math.floor(growthsKnown.length / 2)]
+    : 0;
+
+  return items.map(item => {
+    const relShare = (item.ventas / maxVentas) * 100;
+    const g = item.growth ?? medianGrowth;
+    let cuadrante;
+    if      (relShare >= 15 && g >= 0) cuadrante = 'Estrella';
+    else if (relShare >= 15 && g <  0) cuadrante = 'Vaca';
+    else if (relShare <  15 && g >= 0) cuadrante = 'Interrogante';
+    else                               cuadrante = 'Perro';
+    return { ...item, relShare, growth: g, cuadrante };
+  });
+}
+
 module.exports = {
   filterRecords,
   buildSummary,
@@ -168,5 +242,6 @@ module.exports = {
   buildCategories,
   buildEvolucion,
   buildTopItems,
+  buildBCGData,
   MES_ORDER,
 };

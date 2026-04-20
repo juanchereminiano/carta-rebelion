@@ -225,7 +225,7 @@ function renderDonut(cats, canvasId = 'chart-donut', legendId = 'cat-legend') {
     data: {
       labels: top.map(c => c.nombre),
       datasets: [{ data: top.map(c => isV ? c.ventas : c.cantidad),
-        backgroundColor: colors, borderWidth: 2, borderColor: '#1a1d27', hoverOffset: 6 }],
+        backgroundColor: colors, borderWidth: 0, hoverOffset: 6 }],
     },
     options: {
       responsive: true, maintainAspectRatio: false, cutout: '62%',
@@ -388,7 +388,7 @@ function renderCatBar(cats) {
       scales: {
         x: { ...CHART_DEFAULTS.scaleY, ticks: { color: '#7b7f94',
           callback: v => isV ? '$'+(v>=1e6?(v/1e6).toFixed(1)+'M':(v/1e3).toFixed(0)+'k') : fmt.num(v) } },
-        y: { grid: { color: '#2a2d3a' }, ticks: { color: '#7b7f94', font: { size: 11 } } },
+        y: { grid: { color: '#e8e3db' }, ticks: { color: '#7a7060', font: { size: 11 } } },
       },
     },
   });
@@ -483,100 +483,156 @@ document.getElementById('filter-cat').addEventListener('change',   e => { state.
 // ── MATRIZ BCG ─────────────────────────────────────────────────────────────
 
 const BCG_CONFIG = {
-  Estrella:     { color: '#4a9eff', icon: '★', desc: 'Alta participación + crecimiento. Potenciar.' },
-  Vaca:         { color: '#c8a84b', icon: '◆', desc: 'Alta participación + estable/baja. Mantener.' },
-  Interrogante: { color: '#6e8faf', icon: '?', desc: 'Baja participación + crecimiento. Decidir.' },
-  Perro:        { color: '#3d5a78', icon: '✕', desc: 'Baja participación + declive. Revisar.' },
+  Estrella:     { color: '#3b82f6', bg: 'rgba(59,130,246,0.07)',  icon: '★', desc: 'Alta participación + crecimiento. Potenciar.' },
+  Vaca:         { color: '#c8a84b', bg: 'rgba(200,168,75,0.07)',  icon: '◆', desc: 'Alta participación + estable. Mantener.' },
+  Interrogante: { color: '#8b5cf6', bg: 'rgba(139,92,246,0.07)', icon: '?', desc: 'Baja participación + crecimiento. Decidir.' },
+  Perro:        { color: '#94a3b8', bg: 'rgba(148,163,184,0.07)',icon: '✕', desc: 'Baja participación + declive. Revisar.' },
 };
 
-function buildBCG(data) {
-  const items    = data.pareto.items;
-  const maxVentas = Math.max(...items.map(i => i.ventas));
+// Plugin que pinta los fondos de los cuadrantes antes de dibujar los datos
+const bcgQuadrantPlugin = {
+  id: 'bcgQuadrants',
+  beforeDraw(chart) {
+    const { ctx, chartArea, scales } = chart;
+    if (!chartArea || !scales.x || !scales.y) return;
+    const { left, right, top, bottom } = chartArea;
 
-  // Calcular crecimiento usando evolucion (comparar primer mitad vs segunda mitad del período)
-  const evo      = data.evolucion;
-  const mid      = Math.floor(evo.labels.length / 2);
-  const totalOld = evo.ventas.slice(0, mid).reduce((s, v) => s + (v||0), 0);
-  const totalNew = evo.ventas.slice(mid).reduce((s, v) => s + (v||0), 0);
-  const globalGrowth = totalOld > 0 ? ((totalNew - totalOld) / totalOld) * 100 : 0;
+    const xMid = scales.x.getPixelForValue(15);   // 15% = umbral share
+    const yMid = scales.y.getPixelForValue(0);    // 0% = umbral crecimiento
 
-  return items.map(item => {
-    const relShare = maxVentas > 0 ? item.ventas / maxVentas : 0;
-    // Simular crecimiento por item basado en su clase y posición
-    // (sin datos por período por item, usamos proxy: clase A = positivo, C = negativo)
-    const growthProxy = item.clase === 'A' ? globalGrowth * (0.8 + Math.random()*0.4)
-                      : item.clase === 'B' ? globalGrowth * (0.4 + Math.random()*0.4)
-                      : globalGrowth * (-0.2 + Math.random()*0.4);
+    const xMidClamped = Math.max(left, Math.min(right, xMid));
+    const yMidClamped = Math.max(top,  Math.min(bottom, yMid));
 
-    let cuadrante;
-    if      (relShare >= 0.15 && growthProxy >= 0)  cuadrante = 'Estrella';
-    else if (relShare >= 0.15 && growthProxy <  0)  cuadrante = 'Vaca';
-    else if (relShare <  0.15 && growthProxy >= 0)  cuadrante = 'Interrogante';
-    else                                             cuadrante = 'Perro';
+    const quads = [
+      { color: BCG_CONFIG.Interrogante.bg, x: left,        y: top,         w: xMidClamped - left,   h: yMidClamped - top,    label: 'Interrogante', lx: left + 8,        ly: top + 14 },
+      { color: BCG_CONFIG.Estrella.bg,     x: xMidClamped, y: top,         w: right - xMidClamped,  h: yMidClamped - top,    label: 'Estrella',     lx: right - 8,       ly: top + 14,      anchor: 'right' },
+      { color: BCG_CONFIG.Perro.bg,        x: left,        y: yMidClamped, w: xMidClamped - left,   h: bottom - yMidClamped, label: 'Perro',        lx: left + 8,        ly: bottom - 8 },
+      { color: BCG_CONFIG.Vaca.bg,         x: xMidClamped, y: yMidClamped, w: right - xMidClamped,  h: bottom - yMidClamped, label: 'Vaca',         lx: right - 8,       ly: bottom - 8,    anchor: 'right' },
+    ];
 
-    return { ...item, relShare, growth: growthProxy, cuadrante };
-  });
-}
+    ctx.save();
+    quads.forEach(q => {
+      ctx.fillStyle = q.color;
+      ctx.fillRect(q.x, q.y, q.w, q.h);
+
+      // Etiqueta del cuadrante
+      ctx.font = 'bold 11px system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.textAlign = q.anchor === 'right' ? 'right' : 'left';
+      ctx.textBaseline = q.ly < yMidClamped ? 'top' : 'bottom';
+      ctx.fillText(q.label.toUpperCase(), q.lx, q.ly);
+    });
+
+    // Líneas divisorias
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(xMidClamped, top);
+    ctx.lineTo(xMidClamped, bottom);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(left, yMidClamped);
+    ctx.lineTo(right, yMidClamped);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  },
+};
 
 function renderBCG(data) {
-  const bcgItems = buildBCG(data);
+  const bcgItems = data.bcgData && data.bcgData.length > 0
+    ? data.bcgData
+    : [];
 
-  // Scatter chart
+  if (bcgItems.length === 0) {
+    document.getElementById('bcg-cards').innerHTML =
+      '<p style="color:var(--muted);grid-column:1/-1;text-align:center;padding:24px">No hay suficientes datos para la matriz BCG (se necesitan al menos 2 años).</p>';
+    return;
+  }
+
+  const totalVentas = bcgItems.reduce((s, i) => s + i.ventas, 0) || 1;
+
   const datasets = ['Estrella','Vaca','Interrogante','Perro'].map(q => {
-    const qItems = bcgItems.filter(i => i.cuadrante === q).slice(0, 30);
+    const qItems = bcgItems.filter(i => i.cuadrante === q);
     return {
       label: q,
       data: qItems.map(i => ({
-        x: parseFloat((i.relShare * 100).toFixed(1)),
+        x: parseFloat(i.relShare.toFixed(1)),
         y: parseFloat(i.growth.toFixed(1)),
-        r: Math.max(4, Math.min(20, (i.ventas / data.pareto.total) * 400)),
+        r: Math.max(5, Math.min(22, (i.ventas / totalVentas) * 500)),
         producto: i.producto,
-        ventas: i.ventas,
+        ventas:   i.ventas,
+        growth:   i.growth,
       })),
-      backgroundColor: BCG_CONFIG[q].color + '99',
+      backgroundColor: BCG_CONFIG[q].color + 'bb',
       borderColor:     BCG_CONFIG[q].color,
       borderWidth: 1,
     };
   });
 
-  upsertChart('chart-bcg', {
-    type: 'bubble',
-    data: { datasets },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: CHART_DEFAULTS.legend('bottom'),
-        tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
-          label: ctx => {
-            const d = ctx.raw;
-            return [`  ${d.producto}`, `  Participación: ${d.x}%`, `  Ventas: ${fmt.pesos(d.ventas)}`];
+  // Calcular rango dinámico de los ejes
+  const allX = bcgItems.map(i => i.relShare);
+  const allY = bcgItems.map(i => i.growth);
+  const xMax = Math.min(100, Math.ceil((Math.max(...allX) * 1.15) / 10) * 10 || 100);
+  const yAbsMax = Math.ceil((Math.max(Math.abs(Math.min(...allY)), Math.abs(Math.max(...allY))) * 1.2) / 10) * 10 || 50;
+
+  // Destruir y recrear el chart con el plugin (upsertChart no soporta plugins nuevos)
+  if (charts['chart-bcg']) {
+    charts['chart-bcg'].destroy();
+    delete charts['chart-bcg'];
+  }
+  charts['chart-bcg'] = new Chart(
+    document.getElementById('chart-bcg').getContext('2d'),
+    {
+      type: 'bubble',
+      plugins: [bcgQuadrantPlugin],
+      data: { datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: CHART_DEFAULTS.legend('bottom'),
+          tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
+            label: ctx => {
+              const d = ctx.raw;
+              return [
+                `  ${d.producto}`,
+                `  Participación: ${d.x.toFixed(1)}%`,
+                `  Crecimiento YoY: ${d.growth >= 0 ? '+' : ''}${d.growth.toFixed(1)}%`,
+                `  Ventas: ${fmt.pesos(d.ventas)}`,
+              ];
+            },
+          }},
+        },
+        scales: {
+          x: {
+            min: 0, max: xMax,
+            title: { display: true, text: 'Participación relativa (%)', color: '#7a7060', font: { size: 11 } },
+            grid: { color: '#e8e3db' },
+            ticks: { color: '#7a7060', callback: v => v + '%' },
           },
-        }},
-        annotation: { /* líneas de cuadrante */ },
-      },
-      scales: {
-        x: {
-          title: { display: true, text: 'Participación de mercado (%)', color: '#7b7f94', font: { size: 11 } },
-          grid: { color: '#2a2d3a' }, ticks: { color: '#7b7f94', callback: v => v+'%' },
-        },
-        y: {
-          title: { display: true, text: 'Crecimiento estimado (%)', color: '#7b7f94', font: { size: 11 } },
-          grid: { color: '#2a2d3a' }, ticks: { color: '#7b7f94', callback: v => v+'%' },
+          y: {
+            min: -yAbsMax, max: yAbsMax,
+            title: { display: true, text: 'Crecimiento año a año (%)', color: '#7a7060', font: { size: 11 } },
+            grid: { color: '#e8e3db' },
+            ticks: { color: '#7a7060', callback: v => (v >= 0 ? '+' : '') + v + '%' },
+          },
         },
       },
-    },
-  });
+    }
+  );
 
   // BCG cards por cuadrante
   document.getElementById('bcg-cards').innerHTML = ['Estrella','Vaca','Interrogante','Perro'].map(q => {
     const cfg   = BCG_CONFIG[q];
     const items = bcgItems.filter(i => i.cuadrante === q).slice(0, 8);
+    const total = bcgItems.filter(i => i.cuadrante === q).length;
     return `
       <div class="bcg-card">
         <div class="bcg-card-header">
           <div class="bcg-icon" style="background:${cfg.color}22;color:${cfg.color}">${cfg.icon}</div>
           <div>
-            <div class="bcg-card-title" style="color:${cfg.color}">${q}</div>
+            <div class="bcg-card-title" style="color:${cfg.color}">${q} <span style="font-size:0.75rem;font-weight:400;color:var(--muted)">(${total})</span></div>
             <div class="bcg-card-sub">${cfg.desc}</div>
           </div>
         </div>
@@ -587,8 +643,8 @@ function renderBCG(data) {
               <span class="bcg-item-val">${fmt.pesos(i.ventas)}</span>
             </div>
           `).join('')}
-          ${bcgItems.filter(i => i.cuadrante === q).length > 8
-            ? `<div style="font-size:0.7rem;color:var(--muted);text-align:center;padding:4px">+${bcgItems.filter(i=>i.cuadrante===q).length - 8} más</div>`
+          ${total > 8
+            ? `<div style="font-size:0.7rem;color:var(--muted);text-align:center;padding:4px">+${total - 8} más</div>`
             : ''}
         </div>
       </div>

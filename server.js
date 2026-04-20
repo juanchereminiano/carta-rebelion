@@ -12,6 +12,7 @@ const {
   buildCategories,
   buildEvolucion,
   buildTopItems,
+  buildBCGData,
 } = require('./src/cartaTransform');
 
 const app   = express();
@@ -42,6 +43,7 @@ app.get('/api/carta', async (req, res) => {
       categorias: buildCategories(filtered, metric),
       evolucion:  buildEvolucion(filtered),
       topItems:   buildTopItems(filtered, 30),
+      bcgData:    buildBCGData(records),   // usa TODOS los años para calcular YoY real
     });
   } catch (err) {
     console.error('Error /api/carta:', err.message);
