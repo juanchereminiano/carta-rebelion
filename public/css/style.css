@@ -229,6 +229,8 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 20px;
+  min-width: 0;        /* evita overflow en grid/flex */
+  overflow: hidden;
 }
 .card h2 {
   font-size: 0.8rem; font-weight: 600; color: var(--muted);
@@ -269,18 +271,20 @@ body {
 }
 
 /* ── Two col ─────────────────────────────────────────────────────────────── */
-.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); min-width: 0; }
+.two-col > * { min-width: 0; }
 @media (max-width: 960px) { .two-col { grid-template-columns: 1fr; } }
 
 /* ── Chart wrap ──────────────────────────────────────────────────────────── */
-.chart-wrap { position: relative; }
-
-/* Alturas de charts — controladas por CSS, no por inline style */
-.ch-320 { height: 320px; }
-.ch-300 { height: 300px; }
-.ch-280 { height: 280px; }
-.ch-240 { height: 240px; }
-.ch-220 { height: 220px; }
+/* Con maintainAspectRatio:true en Chart.js el canvas calcula su propio alto.
+   Solo necesitamos width:100% y overflow:hidden para que no rompa el layout. */
+.chart-wrap {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+/* Sparklines fijas (seguimiento cards) */
+.seg-sparkline { height: 60px; position: relative; }
 
 /* ── ABC ─────────────────────────────────────────────────────────────────── */
 .abc-legend { display: flex; align-items: center; gap: 7px; font-size: 0.76rem; color: var(--muted); }
@@ -781,13 +785,7 @@ body {
   .card-header-row { flex-direction: column; align-items: flex-start; gap: 6px; }
   .s-value { font-size: 1.25rem; }
 
-  /* ── Charts — altura reducida en tablet/mobile ── */
-  .ch-320 { height: 260px; }
-  .ch-300 { height: 240px; }
-  .ch-280 { height: 230px; }
-  .ch-220 { height: 200px; }
-  .chart-bcg-wrap { height: 340px; }
-  #seg-combined-card .chart-wrap { height: 220px; }
+  /* Charts — Chart.js maneja el alto via aspectRatio, no se necesita override */
 
   /* ── Tabla ── */
   .metrics-table { font-size: 0.72rem; }
@@ -836,9 +834,6 @@ body {
   .topbar { padding: 0 10px; gap: 8px; }
   .section-title { font-size: 0.9rem; }
   .app-main { padding: 8px; gap: 8px; }
-  .ch-320, .ch-300, .ch-280 { height: 210px; }
-  .ch-220 { height: 190px; }
-  .chart-bcg-wrap { height: 260px; }
-  /* Top tables en mobile: ocultar cant. y precio */
+  /* Top tables en mobile: ocultar cant. */
   .top-table th:nth-child(5), .top-table td:nth-child(5) { display: none; }
 }

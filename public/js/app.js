@@ -11,7 +11,6 @@ const state = {
   // Tabla
   sortCol: 'rank', sortDir: 'asc',
   search: '', clase: 'all', tableCat: 'all',
-  _catalogReady: false,
 };
 
 // Instancias de charts
@@ -518,7 +517,7 @@ function renderPareto(pareto) {
       ],
     },
     options: {
-      responsive: true, maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: true, aspectRatio: 2.6,
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: CHART_DEFAULTS.legend(),
@@ -566,7 +565,7 @@ function renderDonut(cats, canvasId = 'chart-donut', legendId = 'cat-legend') {
         backgroundColor: colors, borderWidth: 0, hoverOffset: 6 }],
     },
     options: {
-      responsive: true, maintainAspectRatio: false, cutout: '62%',
+      responsive: true, maintainAspectRatio: true, aspectRatio: 1.7, cutout: '62%',
       plugins: {
         legend: { display: false },
         tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
@@ -644,7 +643,7 @@ function renderEvolucion(evo) {
       }],
     },
     options: {
-      responsive: true, maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: true, aspectRatio: 3,
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
@@ -737,7 +736,7 @@ function renderCatBar(cats) {
     },
     options: {
       indexAxis: 'y',
-      responsive: true, maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: true, aspectRatio: 1.8,
       plugins: {
         legend: { display: false },
         tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
@@ -1092,7 +1091,7 @@ function renderBCG(data) {
       plugins: [bcgQPlugin],
       data: { datasets },
       options: {
-        responsive: true, maintainAspectRatio: false,
+        responsive: true, maintainAspectRatio: true, aspectRatio: 1.6,
         plugins: {
           legend: CHART_DEFAULTS.legend('bottom'),
           tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
@@ -1455,7 +1454,7 @@ function renderSegCombined(data) {
       type: 'line',
       data: { labels: data.labels, datasets },
       options: {
-        responsive: true, maintainAspectRatio: false,
+        responsive: true, maintainAspectRatio: true, aspectRatio: 2.8,
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: CHART_DEFAULTS.legend('bottom'),
@@ -1480,11 +1479,10 @@ function renderSegCombined(data) {
 function renderAll(data) {
   rawData = data;
 
-  // Catálogo (solo la primera vez o en refresh total)
-  if (!state._catalogReady && data.catalog) {
+  // Catálogo — siempre actualiza para reflejar nuevos productos/años
+  if (data.catalog) {
     populateCatalog(data.catalog);
-    populateSegCatalog(data.catalog);  // también los filtros del seguimiento
-    state._catalogReady = true;
+    populateSegCatalog(data.catalog);
   }
 
   // Dashboard (incluye Evolución y Categorías)
@@ -1518,7 +1516,6 @@ async function loadData({ forceFlush = false } = {}) {
   try {
     if (forceFlush) {
       await fetch('/api/refresh', { method: 'POST' });
-      state._catalogReady = false;
     }
 
     const params = new URLSearchParams({ metric: state.metric });
