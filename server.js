@@ -14,6 +14,7 @@ const {
   buildTopItems,
   buildBCGData,
   buildProductEvolucion,
+  buildInflacion,
 } = require('./src/cartaTransform');
 
 const app   = express();
@@ -66,6 +67,7 @@ app.get('/api/carta', async (req, res) => {
       evolucion:  buildEvolucion(filtered),
       topItems:   buildTopItems(filtered, 30),
       bcgData:    buildBCGData(records),
+      inflacion:  buildInflacion(records),   // sin filtros — historia completa
       catalog,
     });
   } catch (err) {

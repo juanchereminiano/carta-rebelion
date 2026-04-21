@@ -457,6 +457,79 @@ body {
 .bcg-item-name { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
 .bcg-item-val  { font-weight: 600; flex-shrink: 0; margin-left: 8px; }
 
+/* ── Inflación Carta ─────────────────────────────────────────────────────── */
+.inf-annual-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: var(--gap);
+}
+
+.inf-annual-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.inf-total-card {
+  border-color: var(--accent);
+  border-width: 2px;
+  background: rgba(43,94,173,0.03);
+}
+
+.inf-year-label {
+  font-size: 0.7rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--muted);
+  display: flex; align-items: center; gap: 6px;
+}
+.inf-partial {
+  font-size: 0.62rem; background: var(--accent);
+  color: #fff; border-radius: 4px; padding: 1px 5px;
+  text-transform: none; letter-spacing: 0; font-weight: 600;
+}
+
+.inf-cumulative {
+  font-size: 2.4rem; font-weight: 800;
+  line-height: 1; letter-spacing: -0.02em;
+}
+
+.inf-year-sub {
+  font-size: 0.72rem; color: var(--muted); margin-bottom: 4px;
+}
+
+.inf-year-stats {
+  display: flex; flex-direction: column; gap: 5px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  margin-top: 2px;
+}
+.inf-stat {
+  display: flex; justify-content: space-between;
+  font-size: 0.78rem;
+}
+.inf-stat > span:first-child { color: var(--muted); }
+.inf-stat > span:last-child  { font-weight: 600; }
+
+.inf-method-note {
+  font-size: 0.67rem; color: var(--muted);
+  font-style: italic; text-align: right;
+  max-width: 340px; line-height: 1.4;
+}
+
+@media (max-width: 960px) {
+  .inf-annual-grid { grid-template-columns: repeat(2, 1fr); }
+  .inf-cumulative  { font-size: 1.9rem; }
+  .inf-method-note { display: none; }
+}
+@media (max-width: 480px) {
+  .inf-annual-grid { grid-template-columns: 1fr; }
+}
+
 /* ── Coming soon ─────────────────────────────────────────────────────────── */
 .coming-soon {
   display: flex; flex-direction: column; align-items: center;

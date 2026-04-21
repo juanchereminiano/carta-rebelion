@@ -304,6 +304,7 @@ const SECTION_TITLES = {
   dashboard:   'Dashboard Carta',
   tabla:       'Tabla de items',
   bcg:         'Matriz BCG',
+  inflacion:   'Inflación Carta',
   seguimiento: 'Seguimiento',
   cmv:         'CMV',
 };
@@ -1474,6 +1475,160 @@ function renderSegCombined(data) {
   );
 }
 
+// ── INFLACIÓN CARTA ────────────────────────────────────────────────────────
+
+// Devuelve color CSS según el % y si es anual o mensual
+function _infColor(pct, isAnnual = false) {
+  if (pct == null) return 'var(--muted)';
+  if (isAnnual) {
+    if (pct <  30) return '#28a67e';   // bajo
+    if (pct <  80) return '#c8a84b';   // moderado-alto
+    if (pct < 150) return '#e07b39';   // muy alto
+    return '#e03c5a';                  // extremo (Argentina)
+  } else {
+    if (pct < 0)  return '#4a9eff';    // deflación
+    if (pct < 3)  return '#28a67e';
+    if (pct < 7)  return '#c8a84b';
+    if (pct < 15) return '#e07b39';
+    return '#e03c5a';
+  }
+}
+
+function renderInflacion(inf) {
+  if (!inf || !inf.labels || inf.labels.length === 0) return;
+  _renderInfAnnual(inf);
+  _renderInfChart(inf);
+  _renderInfTable(inf.months);
+}
+
+function _renderInfAnnual(inf) {
+  const grid = document.getElementById('inf-annual-grid');
+  if (!grid) return;
+
+  const annualCards = inf.annual.map(y => {
+    const color   = _infColor(y.cumulative, true);
+    const pctStr  = y.cumulative != null ? (y.cumulative >= 0 ? '+' : '') + y.cumulative.toFixed(1) + '%' : '—';
+    const partial = y.meses < 12;
+    return `
+      <div class="inf-annual-card">
+        <div class="inf-year-label">${y.ano}${partial ? ' <span class="inf-partial">en curso</span>' : ''}</div>
+        <div class="inf-cumulative" style="color:${color}">${pctStr}</div>
+        <div class="inf-year-sub">Inflación de carta${partial ? ' (parcial)' : ''}</div>
+        <div class="inf-year-stats">
+          <div class="inf-stat"><span>Precio inicio</span><span>${fmt.pesosFull(y.firstPrice)}</span></div>
+          <div class="inf-stat"><span>Precio cierre</span><span>${fmt.pesosFull(y.lastPrice)}</span></div>
+          <div class="inf-stat"><span>Prom. mensual</span>
+            <span style="color:${_infColor(y.avgMom)};font-weight:700">${y.avgMom != null ? (y.avgMom >= 0 ? '+' : '') + y.avgMom.toFixed(1) + '%' : '—'}</span>
+          </div>
+          <div class="inf-stat"><span>Pico mensual</span>
+            <span style="color:${_infColor(y.maxMom)}">${y.maxMom != null ? '+' + y.maxMom.toFixed(1) + '%' : '—'}</span>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Card de acumulado histórico (solo si hay más de 1 año)
+  let totalCard = '';
+  if (inf.annual.length > 1 && inf.totalCum != null) {
+    const color  = _infColor(inf.totalCum, true);
+    const sign   = inf.totalCum >= 0 ? '+' : '';
+    totalCard = `
+      <div class="inf-annual-card inf-total-card">
+        <div class="inf-year-label">Total histórico</div>
+        <div class="inf-cumulative" style="color:${color}">${sign}${inf.totalCum.toFixed(1)}%</div>
+        <div class="inf-year-sub">${inf.firstLabel} → ${inf.lastLabel}</div>
+        <div class="inf-year-stats">
+          <div class="inf-stat"><span>Años</span><span>${inf.annual.length}</span></div>
+          <div class="inf-stat"><span>Meses</span><span>${inf.labels.length}</span></div>
+        </div>
+      </div>`;
+  }
+
+  grid.innerHTML = annualCards + totalCard;
+}
+
+function _renderInfChart(inf) {
+  const momColors = inf.mom.map(v => {
+    if (v == null) return 'rgba(0,0,0,0)';
+    const c = v < 0 ? '#4a9eff' : v < 3 ? '#28a67e' : v < 7 ? '#c8a84b' : v < 15 ? '#e07b39' : '#e03c5a';
+    return c + 'bb';
+  });
+  const momBorders = inf.mom.map(v => {
+    if (v == null) return 'rgba(0,0,0,0)';
+    return v < 0 ? '#4a9eff' : v < 3 ? '#28a67e' : v < 7 ? '#c8a84b' : v < 15 ? '#e07b39' : '#e03c5a';
+  });
+
+  upsertChart('chart-inflacion', {
+    data: {
+      labels: inf.labels,
+      datasets: [
+        {
+          type: 'line', label: 'Precio promedio ($)',
+          data: inf.avgPrices,
+          borderColor: '#4a9eff', backgroundColor: 'rgba(74,158,255,0.10)',
+          borderWidth: 2.5, pointRadius: 3,
+          pointBackgroundColor: '#4a9eff', pointBorderColor: '#fff', pointBorderWidth: 2,
+          tension: 0.3, fill: true, yAxisID: 'yPrice', order: 1,
+        },
+        {
+          type: 'bar', label: 'Variación MoM (%)',
+          data: inf.mom,
+          backgroundColor: momColors, borderColor: momBorders, borderWidth: 1,
+          borderRadius: 4, yAxisID: 'yMom', order: 2,
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true, aspectRatio: 3,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: CHART_DEFAULTS.legend(),
+        tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
+          label: ctx => {
+            if (ctx.dataset.yAxisID === 'yPrice')
+              return ` Precio prom: ${fmt.pesosFull(ctx.parsed.y)}`;
+            const v = ctx.parsed.y;
+            return v != null ? ` MoM: ${v >= 0 ? '+' : ''}${v.toFixed(1)}%` : null;
+          },
+        }},
+      },
+      scales: {
+        x: CHART_DEFAULTS.scaleX,
+        yPrice: {
+          ...CHART_DEFAULTS.scaleY, position: 'left',
+          ticks: { color: '#4a9eff', callback: v => fmt.pesosFull(v) },
+        },
+        yMom: {
+          position: 'right', grid: { drawOnChartArea: false },
+          ticks: { color: '#7a7060', callback: v => v != null ? (v >= 0 ? '+' : '') + v + '%' : '' },
+        },
+      },
+    },
+  });
+}
+
+function _renderInfTable(months) {
+  const tbody = document.getElementById('inf-monthly-tbody');
+  if (!tbody || !months) return;
+
+  function pctCell(val, isAnnual = false) {
+    if (val == null) return `<td style="color:var(--muted)">—</td>`;
+    const color = _infColor(val, isAnnual);
+    const sign  = val >= 0 ? '+' : '';
+    const bg    = Math.abs(val) > 10 ? `background:${color}18;` : '';
+    return `<td style="color:${color};font-weight:600;${bg}">${sign}${val.toFixed(1)}%</td>`;
+  }
+
+  tbody.innerHTML = [...months].reverse().map(m => `
+    <tr>
+      <td style="text-align:left;font-weight:500;color:var(--text)">${m.label}</td>
+      <td>${fmt.pesosFull(m.avgPrice)}</td>
+      ${pctCell(m.mom)}
+      ${pctCell(m.yoy)}
+      ${pctCell(m.cumAnual)}
+    </tr>`).join('');
+}
+
 // ── Render completo ────────────────────────────────────────────────────────
 
 function renderAll(data) {
@@ -1500,6 +1655,9 @@ function renderAll(data) {
 
   // BCG
   renderBCG(data);
+
+  // Inflación Carta
+  renderInflacion(data.inflacion);
 
   // Timestamp
   const now = new Date().toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' });

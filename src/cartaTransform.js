@@ -266,6 +266,117 @@ function buildBCGData(records) {
   });
 }
 
+// ── Inflación de carta ────────────────────────────────────────────────────────
+// Metodología: precio promedio mensual = ventas_totales / unidades_vendidas
+// Refleja cómo evoluciona el ticket promedio de la carta mes a mes.
+// Calcula: MoM (vs. mes anterior), YoY (vs. mismo mes año anterior),
+//          acumulado del año (vs. enero del mismo año) y resumen anual.
+// Usa TODOS los registros (sin filtros) para mostrar la historia completa.
+function buildInflacion(records) {
+  // ── 1. Agrupar por año+mes ──────────────────────────────────────────────
+  const monthMap = {};
+  for (const r of records) {
+    if (!r.ano || !r.mes) continue;
+    const dinero = r.dinero || 0;
+    const cant   = r.cant   || 0;
+    if (cant <= 0) continue;
+    const key = `${r.ano}-${String(MES_ORDER.indexOf(r.mes)).padStart(2, '0')}`;
+    if (!monthMap[key]) monthMap[key] = { ano: r.ano, mes: r.mes, ventas: 0, cant: 0 };
+    monthMap[key].ventas += dinero;
+    monthMap[key].cant   += cant;
+  }
+
+  const months = Object.entries(monthMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, v]) => ({ ...v, avgPrice: v.ventas / v.cant }))
+    .filter(m => m.avgPrice > 0);
+
+  if (months.length === 0) {
+    return { labels: [], avgPrices: [], mom: [], yoy: [], cumAnual: [], annual: [], totalCum: null, months: [] };
+  }
+
+  // ── 2. MoM (vs. mes anterior inmediato) ───────────────────────────────
+  months.forEach((m, i) => {
+    m.mom = i > 0 && months[i-1].avgPrice > 0
+      ? ((m.avgPrice / months[i-1].avgPrice) - 1) * 100
+      : null;
+  });
+
+  // ── 3. YoY (vs. mismo mes del año anterior) ───────────────────────────
+  const priceByYearMes = {};
+  months.forEach(m => { priceByYearMes[`${m.ano}__${m.mes}`] = m.avgPrice; });
+  months.forEach(m => {
+    const prev = priceByYearMes[`${m.ano - 1}__${m.mes}`];
+    m.yoy = prev ? ((m.avgPrice / prev) - 1) * 100 : null;
+  });
+
+  // ── 4. Acumulado del año (vs. primer mes del mismo año) ───────────────
+  const firstByYear = {};
+  months.forEach(m => { if (!firstByYear[m.ano]) firstByYear[m.ano] = m.avgPrice; });
+  months.forEach(m => {
+    const first = firstByYear[m.ano];
+    m.cumAnual = first > 0 ? ((m.avgPrice / first) - 1) * 100 : null;
+  });
+
+  // ── 5. Resumen por año ─────────────────────────────────────────────────
+  const annualMap = {};
+  months.forEach(m => {
+    if (!annualMap[m.ano]) annualMap[m.ano] = [];
+    annualMap[m.ano].push(m);
+  });
+
+  const annual = Object.entries(annualMap)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([ano, ms]) => {
+      const first    = ms[0].avgPrice;
+      const last     = ms[ms.length - 1].avgPrice;
+      const momValid = ms.filter(m => m.mom !== null);
+      const cumul    = first > 0 ? (last / first - 1) * 100 : null;
+      const avgMom   = momValid.length > 0
+        ? momValid.reduce((s, m) => s + m.mom, 0) / momValid.length : null;
+      const maxMom   = momValid.length > 0
+        ? Math.max(...momValid.map(m => m.mom)) : null;
+      return {
+        ano:        parseInt(ano),
+        firstPrice: Math.round(first),
+        lastPrice:  Math.round(last),
+        cumulative: cumul != null ? parseFloat(cumul.toFixed(1)) : null,
+        meses:      ms.length,
+        avgMom:     avgMom != null ? parseFloat(avgMom.toFixed(1)) : null,
+        maxMom:     maxMom != null ? parseFloat(maxMom.toFixed(1)) : null,
+      };
+    });
+
+  // ── 6. Acumulado histórico total ──────────────────────────────────────
+  const totalFirst = months[0].avgPrice;
+  const totalLast  = months[months.length - 1].avgPrice;
+  const totalCum   = totalFirst > 0
+    ? parseFloat(((totalLast / totalFirst - 1) * 100).toFixed(1)) : null;
+
+  const round1 = n => n != null ? parseFloat(n.toFixed(1)) : null;
+
+  return {
+    labels:    months.map(m => `${m.mes.slice(0, 3)} ${m.ano}`),
+    avgPrices: months.map(m => Math.round(m.avgPrice)),
+    mom:       months.map(m => round1(m.mom)),
+    yoy:       months.map(m => round1(m.yoy)),
+    cumAnual:  months.map(m => round1(m.cumAnual)),
+    annual,
+    totalCum,
+    firstLabel: `${months[0].mes.slice(0,3)} ${months[0].ano}`,
+    lastLabel:  `${months[months.length-1].mes.slice(0,3)} ${months[months.length-1].ano}`,
+    // Detalle mensual para la tabla (más reciente primero al renderizar)
+    months: months.map(m => ({
+      label:    `${m.mes.charAt(0) + m.mes.slice(1).toLowerCase()} ${m.ano}`,
+      ano:      m.ano,
+      avgPrice: Math.round(m.avgPrice),
+      mom:      round1(m.mom),
+      yoy:      round1(m.yoy),
+      cumAnual: round1(m.cumAnual),
+    })),
+  };
+}
+
 // ── Evolución por producto (para Seguimiento) ──────────────────────────────────
 // records: ya filtrados por año/mes
 // productos: watchlist (array de nombres)
@@ -368,5 +479,6 @@ module.exports = {
   buildTopItems,
   buildBCGData,
   buildProductEvolucion,
+  buildInflacion,
   MES_ORDER,
 };

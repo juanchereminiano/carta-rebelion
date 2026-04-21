@@ -36,6 +36,10 @@
       <span class="nav-icon">⌕</span>
       <span class="nav-label">Seguimiento</span>
     </a>
+    <a class="nav-item" data-section="inflacion">
+      <span class="nav-icon">%</span>
+      <span class="nav-label">Inflación Carta</span>
+    </a>
     <a class="nav-item nav-item-disabled" data-section="cmv">
       <span class="nav-icon">$</span>
       <span class="nav-label">CMV <span class="soon-badge">Pronto</span></span>
@@ -316,6 +320,44 @@
         <div class="coming-icon">⌕</div>
         <h2 style="color:var(--text);font-size:1.1rem;text-transform:none;letter-spacing:0;margin:0">Ningún producto en seguimiento</h2>
         <p>Buscá un producto arriba y hacé clic para agregarlo.<br>Vas a ver su evolución, tendencia y KPIs en un solo lugar.</p>
+      </div>
+
+    </section>
+
+    <!-- INFLACIÓN CARTA ──────────────────────────────────────────────── -->
+    <section id="section-inflacion" class="page-section">
+
+      <!-- KPI cards anuales -->
+      <div id="inf-annual-grid" class="inf-annual-grid"></div>
+
+      <!-- Gráfico combo: precio promedio + MoM -->
+      <div class="card">
+        <div class="card-header-row">
+          <h2>Precio promedio mensual y variación MoM</h2>
+          <span class="inf-method-note">Precio prom. = ventas totales ÷ unidades vendidas · sin filtros, historia completa</span>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="chart-inflacion"></canvas>
+        </div>
+      </div>
+
+      <!-- Tabla mensual -->
+      <div class="card">
+        <h2>Detalle mensual — más reciente primero</h2>
+        <div class="table-wrap">
+          <table class="metrics-table" id="inf-monthly-table">
+            <thead>
+              <tr>
+                <th style="text-align:left">Período</th>
+                <th>Precio prom.</th>
+                <th>Var. MoM</th>
+                <th>Var. YoY</th>
+                <th>Acum. del año</th>
+              </tr>
+            </thead>
+            <tbody id="inf-monthly-tbody"></tbody>
+          </table>
+        </div>
       </div>
 
     </section>
