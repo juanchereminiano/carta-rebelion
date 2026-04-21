@@ -1492,7 +1492,6 @@ function renderAll(data) {
   renderABCCards(data.pareto);
   renderEvolucion(data.evolucion);
   renderDashTopTables(data.pareto.items);
-  renderCatBar(data.categorias);
   renderCatTable(data.categorias);
 
   // Tabla
