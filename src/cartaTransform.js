@@ -344,7 +344,7 @@ function buildInflacion(records) {
     }
     // sumWeights = fracción del mes B cubierta por productos con precio previo.
     // Retornamos null si la cobertura es menor al 10% (datos insuficientes).
-    return sumWeights >= 0.10 ? { inf: sumWeighted, cobertura: Math.round(sumWeights * 100) } : null;
+    return sumWeights >= 0.05 ? { inf: sumWeighted, cobertura: Math.round(sumWeights * 100) } : null;
   }
 
   // ── 3. Construir serie mensual ───────────────────────────────────────
@@ -519,6 +519,12 @@ function buildProductEvolucion(records, productos = []) {
 
     const rk = rankMap[prod] || { rankVentas: null, rankCantidad: null, pctVentas: 0, pctCantidad: 0 };
 
+    // Precio promedio mensual (para seguimiento de precios)
+    const preciosArr = allKeys.map(k => {
+      const d = byKey[k];
+      return (d && d.cantidad > 0) ? Math.round(d.ventas / d.cantidad) : null;
+    });
+
     resultado[prod] = {
       ventas: ventasArr, cantidad: cantidadArr,
       totalVentas, totalCantidad,
@@ -526,6 +532,7 @@ function buildProductEvolucion(records, productos = []) {
       trendCantidad:  prev3c > 0 ? ((last3c - prev3c) / prev3c) * 100 : null,
       categoria:      byKey._categoria || '—',
       precioPromedio: totalCantidad > 0 ? Math.round(totalVentas / totalCantidad) : null,
+      precios:        preciosArr,
       // Ranking en el período filtrado
       rankVentas:    rk.rankVentas,
       rankCantidad:  rk.rankCantidad,

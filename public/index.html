@@ -362,6 +362,54 @@
         </div>
       </div>
 
+      <!-- ── Precios por producto ──────────────────────────────────────── -->
+      <div class="dash-section-label" style="margin-top:var(--gap)">Precios por producto</div>
+
+      <!-- Buscador + filtros -->
+      <div class="card seg-search-card">
+        <div class="card-header-row">
+          <h2>Evolución de precios por producto</h2>
+          <span class="seg-hint">Elegí productos para ver cómo evolucionó su precio</span>
+        </div>
+
+        <div class="seg-search-row">
+          <div class="seg-search-box">
+            <input id="inf-prod-input" class="search-input seg-input" type="text"
+              placeholder="Buscar producto para agregar..." autocomplete="off" />
+            <div id="inf-prod-suggestions" class="seg-suggestions"></div>
+          </div>
+        </div>
+
+        <div id="inf-prod-chips" class="seg-chips"></div>
+
+        <div class="seg-filters">
+          <span class="seg-filters-label">Filtrar por:</span>
+          <div id="inf-prod-ms-ano" class="ms-wrap"></div>
+          <button id="inf-prod-btn-apply" class="seg-apply-btn">Ver precios</button>
+        </div>
+      </div>
+
+      <!-- Gráfico combinado de precios -->
+      <div class="card" id="inf-prod-chart-card" style="display:none">
+        <div class="card-header-row">
+          <h2>Evolución de precios</h2>
+          <span id="inf-prod-period-label" style="font-size:0.75rem;color:var(--muted)"></span>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="chart-inf-prod"></canvas>
+        </div>
+      </div>
+
+      <!-- Cards por producto -->
+      <div id="inf-prod-grid" class="inf-prod-grid"></div>
+
+      <!-- Estado vacío -->
+      <div id="inf-prod-empty" class="card coming-soon">
+        <div class="coming-icon">₱</div>
+        <h2 style="color:var(--text);font-size:1.1rem;text-transform:none;letter-spacing:0;margin:0">Ningún producto seleccionado</h2>
+        <p>Buscá un producto arriba para ver la evolución de su precio mes a mes.</p>
+      </div>
+
     </section>
 
     <!-- CMV ───────────────────────────────────────────────────────────── -->

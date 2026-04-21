@@ -1769,6 +1769,285 @@ function _renderInfTable(months, lookup) {
   }).join('');
 }
 
+// ── PRECIOS POR PRODUCTO (subsección de Inflación) ────────────────────────
+
+const INF_PROD_KEY     = 'carta_inf_prod_v1';
+let   infProdList      = JSON.parse(localStorage.getItem(INF_PROD_KEY) || '[]');
+let   infProdMsAno;
+const INF_PROD_PALETTE = ['#4a9eff','#c8a84b','#22c55e','#f43f5e','#a855f7','#14b8a6','#f97316','#6366f1'];
+
+function saveInfProdList() { localStorage.setItem(INF_PROD_KEY, JSON.stringify(infProdList)); }
+
+function renderInfProdChips() {
+  const container = document.getElementById('inf-prod-chips');
+  if (!container) return;
+  container.innerHTML = infProdList.map((name, i) => `
+    <div class="seg-chip">
+      <span>${name}</span>
+      <button class="seg-chip-remove" data-idx="${i}" title="Quitar">✕</button>
+    </div>
+  `).join('');
+  container.querySelectorAll('.seg-chip-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      infProdList.splice(Number(btn.dataset.idx), 1);
+      saveInfProdList();
+      renderInfProdChips();
+      loadInfProdData();
+    });
+  });
+}
+
+function initInfProdSearch() {
+  const input       = document.getElementById('inf-prod-input');
+  const suggestions = document.getElementById('inf-prod-suggestions');
+  if (!input) return;
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    if (!q) { suggestions.classList.remove('open'); return; }
+
+    const matches = catalog.productos
+      .filter(p => p.producto.toLowerCase().includes(q))
+      .slice(0, 12);
+
+    if (!matches.length) { suggestions.classList.remove('open'); return; }
+
+    suggestions.innerHTML = matches.map(p => {
+      const already = infProdList.includes(p.producto);
+      return `
+        <div class="seg-sug-item${already ? ' seg-sug-already' : ''}" data-prod="${p.producto}" data-cat="${p.categoria || ''}">
+          <span class="seg-sug-name">${p.producto}</span>
+          <span class="seg-sug-cat">${p.categoria || ''}</span>
+          <span class="seg-sug-add">${already ? '✓ ya agregado' : '+ Agregar'}</span>
+        </div>`;
+    }).join('');
+    suggestions.classList.add('open');
+
+    suggestions.querySelectorAll('.seg-sug-item:not(.seg-sug-already)').forEach(el => {
+      el.addEventListener('click', () => {
+        const prod = el.dataset.prod;
+        if (!infProdList.includes(prod)) {
+          infProdList.push(prod);
+          saveInfProdList();
+          renderInfProdChips();
+          loadInfProdData();
+        }
+        input.value = '';
+        suggestions.classList.remove('open');
+      });
+    });
+  });
+
+  document.addEventListener('click', e => {
+    if (!input.contains(e.target) && !suggestions.contains(e.target))
+      suggestions.classList.remove('open');
+  });
+}
+
+function initInfProdFilters() {
+  infProdMsAno = new MultiSelect({
+    container: document.getElementById('inf-prod-ms-ano'),
+    label: 'Año',
+    onChange: () => {},  // se aplica al presionar el botón
+  });
+  document.getElementById('inf-prod-btn-apply').addEventListener('click', loadInfProdData);
+}
+
+function populateInfProdCatalog(cat) {
+  if (infProdMsAno) infProdMsAno.setOptions(cat.anos.map(a => ({ value: String(a), text: String(a) })));
+}
+
+async function loadInfProdData() {
+  const chartCard = document.getElementById('inf-prod-chart-card');
+  const grid      = document.getElementById('inf-prod-grid');
+  const empty     = document.getElementById('inf-prod-empty');
+
+  if (infProdList.length === 0) {
+    grid.innerHTML = '';
+    if (chartCard) chartCard.style.display = 'none';
+    if (empty)     empty.style.display     = '';
+    return;
+  }
+
+  if (empty) empty.style.display = 'none';
+  grid.innerHTML = '<p style="color:var(--muted);font-size:0.82rem;padding:8px 0">Cargando…</p>';
+
+  try {
+    const params = new URLSearchParams({ productos: infProdList.join(',') });
+    const anos   = infProdMsAno ? infProdMsAno.getValue() : ['all'];
+    if (!anos.includes('all')) params.set('anos', anos.join(','));
+
+    const data = await fetch(`/api/seguimiento?${params}`).then(r => r.json());
+    if (data.error) throw new Error(data.error);
+
+    const periodEl = document.getElementById('inf-prod-period-label');
+    if (periodEl) periodEl.textContent = anos.includes('all') ? 'Historia completa' : anos.join(', ');
+
+    renderInfProdCombined(data);
+    renderInfProdCards(data);
+
+    if (chartCard) chartCard.style.display = Object.keys(data.productos).length > 0 ? '' : 'none';
+  } catch (err) {
+    grid.innerHTML = `<p style="color:#e03c5a;padding:8px 0">Error: ${err.message}</p>`;
+  }
+}
+
+function renderInfProdCombined(data) {
+  const prods     = Object.entries(data.productos);
+  const hasPrices = prods.some(([, d]) => (d.precios || []).some(p => p != null));
+  if (!prods.length || !hasPrices) return;
+
+  const datasets = prods.map(([prod, d], i) => ({
+    label:           prod,
+    data:            d.precios || [],
+    borderColor:     INF_PROD_PALETTE[i % INF_PROD_PALETTE.length],
+    backgroundColor: 'transparent',
+    borderWidth:     2,
+    tension:         0.3,
+    pointRadius:     3,
+    pointBackgroundColor: INF_PROD_PALETTE[i % INF_PROD_PALETTE.length],
+    pointBorderColor: '#fff', pointBorderWidth: 1.5,
+    fill:      false,
+    spanGaps:  true,
+  }));
+
+  if (charts['chart-inf-prod']) { charts['chart-inf-prod'].destroy(); delete charts['chart-inf-prod']; }
+
+  charts['chart-inf-prod'] = new Chart(
+    document.getElementById('chart-inf-prod').getContext('2d'), {
+      type: 'line',
+      data: { labels: data.labels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: true, aspectRatio: 2.8,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: CHART_DEFAULTS.legend('bottom'),
+          tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
+            label: ctx => ctx.parsed.y != null
+              ? ` ${ctx.dataset.label}: ${fmt.pesosFull(ctx.parsed.y)}`
+              : null,
+          }},
+        },
+        scales: {
+          x: CHART_DEFAULTS.scaleX,
+          y: {
+            ...CHART_DEFAULTS.scaleY,
+            ticks: { color: '#7b7f94', callback: v => fmt.pesosFull(v) },
+          },
+        },
+      },
+    }
+  );
+}
+
+function renderInfProdCards(data) {
+  const grid  = document.getElementById('inf-prod-grid');
+  const prods = Object.entries(data.productos);
+
+  if (!prods.length) {
+    grid.innerHTML = '<p style="color:var(--muted);font-size:0.82rem;padding:8px 0">Sin datos para el período.</p>';
+    return;
+  }
+
+  // Destruir sparklines anteriores
+  Object.keys(charts).filter(k => k.startsWith('inf-prod-spark-')).forEach(k => {
+    charts[k].destroy(); delete charts[k];
+  });
+
+  grid.innerHTML = prods.map(([prod, d], i) => {
+    const color   = INF_PROD_PALETTE[i % INF_PROD_PALETTE.length];
+    const precios = d.precios || [];
+
+    // Precio actual = último no-nulo
+    const nonNull    = precios.map((p, idx) => p != null ? { p, idx } : null).filter(Boolean);
+    const currentP   = nonNull.length > 0 ? nonNull[nonNull.length - 1].p : null;
+    const firstP     = nonNull.length > 0 ? nonNull[0].p : null;
+    const currentLbl = nonNull.length > 0 ? data.labels[nonNull[nonNull.length - 1].idx] : null;
+    const firstLbl   = nonNull.length > 0 ? data.labels[nonNull[0].idx] : null;
+
+    // Variación desde inicio
+    const totalPct = (firstP && currentP && firstP > 0)
+      ? parseFloat(((currentP / firstP - 1) * 100).toFixed(1)) : null;
+
+    // MoM: actual vs penúltimo no-nulo
+    const momPct = nonNull.length >= 2
+      ? parseFloat(((nonNull.at(-1).p / nonNull.at(-2).p - 1) * 100).toFixed(1))
+      : null;
+
+    // YoY: buscar precio de ~12 entradas atrás (aprox. 1 año)
+    let yoyPct = null;
+    if (nonNull.length >= 2) {
+      const cur      = nonNull.at(-1);
+      const yoyEntry = nonNull.find(e => e.idx <= cur.idx - 11);
+      if (yoyEntry && yoyEntry.p > 0)
+        yoyPct = parseFloat(((cur.p / yoyEntry.p - 1) * 100).toFixed(1));
+    }
+
+    function changeBadge(val, label) {
+      if (val == null) return '';
+      const clr  = val > 5 ? '#e03c5a' : val > 0 ? '#e07b39' : val < -1 ? '#28a67e' : 'var(--muted)';
+      const sign = val >= 0 ? '+' : '';
+      return `<div class="inf-prod-change">
+        <span class="inf-prod-change-val" style="color:${clr}">${sign}${val.toFixed(1)}%</span>
+        <span class="inf-prod-change-label">${label}</span>
+      </div>`;
+    }
+
+    return `
+      <div class="inf-prod-card">
+        <div class="inf-prod-header">
+          <div class="inf-prod-color" style="background:${color}"></div>
+          <div style="flex:1;min-width:0">
+            <div class="inf-prod-name">${prod}</div>
+            ${d.categoria && d.categoria !== '—' ? `<span class="cat-tag">${d.categoria}</span>` : ''}
+          </div>
+        </div>
+
+        <div class="inf-prod-price">
+          ${currentP != null ? fmt.pesosFull(currentP) : '—'}
+          <span class="inf-prod-price-sub">${currentLbl || ''}</span>
+        </div>
+
+        <div class="inf-prod-changes">
+          ${changeBadge(momPct,   'últ. mes')}
+          ${changeBadge(yoyPct,   'vs año ant.')}
+          ${changeBadge(totalPct, 'desde inicio')}
+        </div>
+
+        ${firstP != null && firstLbl != null ? `<div class="inf-prod-from">Inicio: ${fmt.pesosFull(firstP)} · ${firstLbl}</div>` : ''}
+
+        <div class="inf-prod-sparkline"><canvas id="inf-prod-spark-${i}"></canvas></div>
+      </div>`;
+  }).join('');
+
+  // Sparklines de precio
+  prods.forEach(([, d], i) => {
+    const color = INF_PROD_PALETTE[i % INF_PROD_PALETTE.length];
+    const ctx   = document.getElementById(`inf-prod-spark-${i}`);
+    if (!ctx) return;
+    charts[`inf-prod-spark-${i}`] = new Chart(ctx.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: data.labels,
+        datasets: [{
+          data: d.precios || [],
+          borderColor:     color,
+          backgroundColor: color + '18',
+          borderWidth: 2, pointRadius: 2, tension: 0.4, fill: true, spanGaps: true,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: {
+          ...CHART_DEFAULTS.tooltip,
+          callbacks: { label: c => c.parsed.y != null ? ` ${fmt.pesosFull(c.parsed.y)}` : null },
+        }},
+        scales: { x: { display: false }, y: { display: false } },
+      },
+    });
+  });
+}
+
 // ── Render completo ────────────────────────────────────────────────────────
 
 function renderAll(data) {
@@ -1778,6 +2057,7 @@ function renderAll(data) {
   if (data.catalog) {
     populateCatalog(data.catalog);
     populateSegCatalog(data.catalog);
+    populateInfProdCatalog(data.catalog);
   }
 
   // Dashboard (incluye Evolución y Categorías)
@@ -1849,9 +2129,9 @@ document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', async () => {
       if (!_indecLoaded) {
         await loadINDEC();
-        // Re-renderizar la sección con los datos INDEC recién cargados
         if (rawData && rawData.inflacion) renderInflacion(rawData.inflacion, _indecData);
       }
+      if (infProdList.length > 0) loadInfProdData();
     }, { capture: true });
   }
 });
@@ -1862,5 +2142,8 @@ initFilters();
 initSegFilters();
 renderSegChips();
 initSegSearch();
+initInfProdFilters();
+renderInfProdChips();
+initInfProdSearch();
 _startAutoRefresh();   // auto-refresh cada 60s
 loadData();
