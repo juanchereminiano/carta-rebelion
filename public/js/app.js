@@ -291,25 +291,32 @@ function setRefreshStatus(state) {
   }
 }
 
+const AUTO_REFRESH_MS = 10 * 60 * 1000;  // 10 minutos
+
+function _fmtCountdown(secs) {
+  if (secs <= 0) return 'ahora';
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
 function _startStatusTick() {
   if (_statusTimer) clearInterval(_statusTimer);
   _statusTimer = setInterval(() => {
     const el = document.getElementById('refresh-status');
     if (!el || !_lastFetch) return;
-    const secsAgo = Math.round((Date.now() - _lastFetch) / 1000);
-    _autoCountdown = Math.max(0, 60 - secsAgo);
-    el.className = 'refresh-status ok';
+    const secsAgo  = Math.round((Date.now() - _lastFetch) / 1000);
+    const secsLeft = Math.max(0, AUTO_REFRESH_MS / 1000 - secsAgo);
+    el.className   = 'refresh-status ok';
     el.textContent = secsAgo < 5
       ? '✓ Actualizado'
-      : `Actualizado hace ${secsAgo}s · próximo en ${_autoCountdown}s`;
+      : `Actualizado hace ${_fmtCountdown(secsAgo)} · próximo en ${_fmtCountdown(secsLeft)}`;
   }, 1000);
 }
 
 function _startAutoRefresh() {
   if (_autoRefresh) clearInterval(_autoRefresh);
-  _autoRefresh = setInterval(() => {
-    loadData();   // el servidor tiene cache de 60s; este ciclo coincide con eso
-  }, 60_000);
+  _autoRefresh = setInterval(() => loadData(), AUTO_REFRESH_MS);
 }
 
 // ── Sidebar navigation ─────────────────────────────────────────────────────
