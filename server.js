@@ -64,7 +64,9 @@ async function fetchIPC() {
 
   const json = await httpsGetJSON(IPC_URL);
 
-  const data = (json.data || [])
+  // La serie devuelve el NIVEL del índice (base = 100 en diciembre de algún año),
+  // no la variación mensual. Calculamos MoM = (actual / anterior - 1) * 100.
+  const raw = (json.data || [])
     .filter(([, v]) => v != null)
     .map(([date, value]) => {
       const d = new Date(date + 'T12:00:00Z');
@@ -74,9 +76,20 @@ async function fetchIPC() {
         year:   d.getUTCFullYear(),
         month:  m + 1,
         mes:    MES_NAMES[m],
-        mom:    parseFloat(value.toFixed(2)),
+        index:  value,
       };
     });
+
+  // Derivada: % cambio entre meses consecutivos (orden ascendente garantizado por sort=asc)
+  const data = raw
+    .map((d, i) => ({
+      period: d.period,
+      year:   d.year,
+      month:  d.month,
+      mes:    d.mes,
+      mom:    i === 0 ? null : parseFloat(((d.index / raw[i - 1].index - 1) * 100).toFixed(2)),
+    }))
+    .filter(d => d.mom !== null);  // descartamos el primer dato (sin anterior)
 
   ipcCache.set('ipc', data);
   return data;
