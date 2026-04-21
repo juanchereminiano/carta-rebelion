@@ -302,7 +302,7 @@ function _startAutoRefresh() {
 
 // ── Sidebar navigation ─────────────────────────────────────────────────────
 const SECTION_TITLES = {
-  dashboard:   'Dashboard',
+  dashboard:   'Dashboard Carta',
   tabla:       'Tabla de items',
   bcg:         'Matriz BCG',
   seguimiento: 'Seguimiento',
@@ -445,6 +445,17 @@ const CHART_DEFAULTS = {
 const CLASE_COLOR  = { A: '#4a9eff', B: '#c8a84b', C: '#5a7fa8' };  // azul / dorado / azul apagado
 const CAT_PALETTE  = ['#2b5ead','#4a9eff','#c8a84b','#3b8a6e','#6e4fa8','#2d7d9a','#b87333','#4a7c59','#7a5c8a','#2a6496','#8a6a2a','#3d6b8a'];
 
+// ── Helper: gradiente canvas ───────────────────────────────────────────────
+function canvasGradient(canvasId, stops) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return stops[0][1];
+  const ctx = canvas.getContext('2d');
+  const h = canvas.parentElement?.offsetHeight || 280;
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  stops.forEach(([pos, color]) => g.addColorStop(pos, color));
+  return g;
+}
+
 // ── DASHBOARD ──────────────────────────────────────────────────────────────
 
 function renderSummary(s) {
@@ -452,7 +463,7 @@ function renderSummary(s) {
   document.getElementById('summary-grid').innerHTML = `
     <div class="summary-card">
       <div class="s-label">${isV ? 'Ventas totales' : 'Unidades vendidas'}</div>
-      <div class="s-value">${isV ? fmt.pesos(s.totalVentas) : fmt.num(s.totalCantidad)}</div>
+      <div class="s-value">${isV ? fmt.pesosFull(s.totalVentas) : fmt.num(s.totalCantidad)}</div>
       <div class="s-sub">${(s.años||[]).join(' · ')}</div>
     </div>
     <div class="summary-card">
@@ -475,9 +486,12 @@ function renderSummary(s) {
 
 function renderPareto(pareto) {
   const items   = pareto.items.slice(0, 20);
-  const labels  = items.map(i => i.producto.length > 20 ? i.producto.slice(0,18)+'…' : i.producto);
+  const labels  = items.map(i => i.producto.length > 18 ? i.producto.slice(0,16)+'…' : i.producto);
   const valores = items.map(i => state.metric === 'cantidad' ? i.cantidad : i.ventas);
   const isV     = state.metric === 'ventas';
+
+  // Colores por clase: A=verde esmeralda, B=dorado, C=azul apagado
+  const CLASE_BAR = { A: '#38d9a9', B: '#c8a84b', C: '#6e8faf' };
 
   upsertChart('chart-pareto', {
     data: {
@@ -485,14 +499,21 @@ function renderPareto(pareto) {
       datasets: [
         {
           type: 'bar', label: isV ? 'Ventas $' : 'Cantidad',
-          data: valores, backgroundColor: items.map(i => CLASE_COLOR[i.clase]+'cc'),
-          borderRadius: 4, yAxisID: 'yBar', order: 2,
+          data: valores,
+          backgroundColor: items.map(i => CLASE_BAR[i.clase] + 'dd'),
+          borderColor:     items.map(i => CLASE_BAR[i.clase]),
+          borderWidth: 0,
+          borderRadius: { topLeft: 5, topRight: 5 },
+          borderSkipped: 'bottom',
+          yAxisID: 'yBar', order: 2,
         },
         {
           type: 'line', label: '% Acumulado',
           data: items.map(i => i.pctCum),
-          borderColor: '#c8a84b', backgroundColor: 'transparent',
-          borderWidth: 2, pointRadius: 3, tension: 0.3, yAxisID: 'yLine', order: 1,
+          borderColor: '#c8a84b',
+          backgroundColor: 'rgba(200,168,75,0.08)',
+          borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: '#c8a84b',
+          tension: 0.35, yAxisID: 'yLine', order: 1, fill: false,
         },
       ],
     },
@@ -501,18 +522,32 @@ function renderPareto(pareto) {
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: CHART_DEFAULTS.legend(),
-        tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
-          label: ctx => ctx.dataset.yAxisID === 'yLine'
-            ? ` Acum: ${ctx.parsed.y.toFixed(1)}%`
-            : isV ? ` ${fmt.pesosFull(ctx.parsed.y)}` : ` ${fmt.num(ctx.parsed.y)} uds`,
-        }},
+        tooltip: {
+          ...CHART_DEFAULTS.tooltip,
+          callbacks: {
+            title: (ctx) => ctx[0]?.label || '',
+            label: ctx => ctx.dataset.yAxisID === 'yLine'
+              ? ` Acum: ${ctx.parsed.y.toFixed(1)}%`
+              : isV ? ` ${fmt.pesosFull(ctx.parsed.y)}` : ` ${fmt.num(ctx.parsed.y)} uds`,
+          },
+        },
       },
       scales: {
-        x: CHART_DEFAULTS.scaleX,
-        yBar: { ...CHART_DEFAULTS.scaleY, position: 'left', ticks: { color: '#7b7f94',
-          callback: v => isV ? '$'+(v>=1e6?(v/1e6).toFixed(1)+'M':(v/1e3).toFixed(0)+'k') : fmt.num(v) } },
-        yLine: { position: 'right', grid: { drawOnChartArea: false }, min: 0, max: 100,
-          ticks: { color: '#7b7f94', callback: v => v+'%' } },
+        x: {
+          ...CHART_DEFAULTS.scaleX,
+          ticks: { color: '#7a7060', maxRotation: 50, font: { size: 10 } },
+        },
+        yBar: {
+          ...CHART_DEFAULTS.scaleY,
+          position: 'left',
+          ticks: { color: '#7b7f94',
+            callback: v => isV ? '$'+(v>=1e6?(v/1e6).toFixed(1)+'M':(v>=1e3?(v/1e3).toFixed(0)+'k':v)) : fmt.num(v),
+          },
+        },
+        yLine: {
+          position: 'right', grid: { drawOnChartArea: false }, min: 0, max: 100,
+          ticks: { color: '#c8a84b', callback: v => v+'%', font: { size: 10 } },
+        },
       },
     },
   });
@@ -583,6 +618,12 @@ function renderABCCards(pareto) {
 
 function renderEvolucion(evo) {
   const isV = state.metric === 'ventas';
+  const grad = canvasGradient('chart-evolucion', [
+    [0,   'rgba(74,158,255,0.28)'],
+    [0.6, 'rgba(74,158,255,0.06)'],
+    [1,   'rgba(74,158,255,0.00)'],
+  ]);
+
   upsertChart('chart-evolucion', {
     type: 'line',
     data: {
@@ -590,8 +631,16 @@ function renderEvolucion(evo) {
       datasets: [{
         label: isV ? 'Ventas $' : 'Cantidad',
         data: isV ? evo.ventas : evo.cantidad,
-        borderColor: '#4a9eff', backgroundColor: '#2b5ead18',
-        borderWidth: 2.5, tension: 0.35, pointRadius: 4, fill: true,
+        borderColor: '#4a9eff',
+        backgroundColor: grad,
+        borderWidth: 2.5,
+        tension: 0.4,
+        pointRadius: 4,
+        pointBackgroundColor: '#4a9eff',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointHoverRadius: 6,
+        fill: true,
       }],
     },
     options: {
@@ -605,8 +654,12 @@ function renderEvolucion(evo) {
       },
       scales: {
         x: CHART_DEFAULTS.scaleX,
-        y: { ...CHART_DEFAULTS.scaleY, ticks: { color: '#7b7f94',
-          callback: v => isV ? '$'+(v>=1e6?(v/1e6).toFixed(1)+'M':(v/1e3).toFixed(0)+'k') : fmt.num(v) } },
+        y: {
+          ...CHART_DEFAULTS.scaleY,
+          ticks: { color: '#7b7f94',
+            callback: v => isV ? '$'+(v>=1e6?(v/1e6).toFixed(1)+'M':(v>=1e3?(v/1e3).toFixed(0)+'k':v)) : fmt.num(v),
+          },
+        },
       },
     },
   });
@@ -675,8 +728,11 @@ function renderCatBar(cats) {
       datasets: [{
         label: isV ? 'Ventas $' : 'Cantidad',
         data: top.map(c => isV ? c.ventas : c.cantidad),
-        backgroundColor: colors,
-        borderRadius: 4,
+        backgroundColor: colors.map(c => c + 'cc'),
+        borderColor:     colors,
+        borderWidth: 0,
+        borderRadius: { topRight: 5, bottomRight: 5 },
+        borderSkipped: 'left',
       }],
     },
     options: {
@@ -689,9 +745,13 @@ function renderCatBar(cats) {
         }},
       },
       scales: {
-        x: { ...CHART_DEFAULTS.scaleY, ticks: { color: '#7b7f94',
-          callback: v => isV ? '$'+(v>=1e6?(v/1e6).toFixed(1)+'M':(v/1e3).toFixed(0)+'k') : fmt.num(v) } },
-        y: { grid: { color: '#e8e3db' }, ticks: { color: '#7a7060', font: { size: 11 } } },
+        x: {
+          ...CHART_DEFAULTS.scaleY,
+          ticks: { color: '#7b7f94',
+            callback: v => isV ? '$'+(v>=1e6?(v/1e6).toFixed(1)+'M':(v>=1e3?(v/1e3).toFixed(0)+'k':v)) : fmt.num(v),
+          },
+        },
+        y: { grid: { display: false }, ticks: { color: '#7a7060', font: { size: 11 } } },
       },
     },
   });
@@ -720,6 +780,42 @@ function renderCatTable(cats) {
     sel.appendChild(opt);
   });
   if (cats.find(c => c.nombre === cur)) sel.value = cur;
+}
+
+// ── TOP 10 / TOP 11-20 (Dashboard) ────────────────────────────────────────
+
+function renderDashTopTables(items) {
+  const isV = state.metric === 'ventas';
+
+  function buildRows(slice, startRank) {
+    if (!slice.length) return `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">Sin datos</td></tr>`;
+    return slice.map((item, i) => {
+      const rank = startRank + i;
+      const rankColor = rank === 1 ? '#c8a84b' : rank <= 3 ? '#4a9eff' : 'var(--muted)';
+      return `
+        <tr>
+          <td style="text-align:center;font-weight:700;color:${rankColor};font-size:0.78rem">${rank}</td>
+          <td style="text-align:left;color:var(--text);font-weight:500;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.producto}</td>
+          <td style="text-align:left"><span class="cat-tag">${(item.categoria||'').replace(/^\d+\s+/,'')}</span></td>
+          <td>${isV ? fmt.pesosFull(item.ventas) : fmt.num(item.cantidad)}</td>
+          <td style="color:var(--muted)">${fmt.num(item.cantidad)}</td>
+          <td>${fmt.pct(item.pct)}</td>
+          <td><span class="badge-inline ${(item.clase||'c').toLowerCase()}">${item.clase||'C'}</span></td>
+        </tr>`;
+    }).join('');
+  }
+
+  const t1 = document.getElementById('top10-tbody');
+  const t2 = document.getElementById('top20-tbody');
+  const h1 = document.querySelector('#top10-table thead tr');
+  const h2 = document.querySelector('#top20-table thead tr');
+
+  // Actualizar encabezado de columna según métrica
+  const valHeader = isV ? 'Ventas $' : 'Cant.';
+  [h1, h2].forEach(h => { if (h) h.cells[3].textContent = valHeader; });
+
+  if (t1) t1.innerHTML = buildRows(items.slice(0, 10), 1);
+  if (t2) t2.innerHTML = buildRows(items.slice(10, 20), 11);
 }
 
 // ── TABLA ──────────────────────────────────────────────────────────────────
@@ -1397,7 +1493,7 @@ function renderAll(data) {
   renderDonut(data.categorias, 'chart-donut', 'cat-legend');
   renderABCCards(data.pareto);
   renderEvolucion(data.evolucion);
-  renderEvolucionCat(data);
+  renderDashTopTables(data.pareto.items);
   renderCatBar(data.categorias);
   renderCatTable(data.categorias);
 

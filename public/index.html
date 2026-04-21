@@ -22,7 +22,7 @@
   <nav class="sidebar-nav">
     <a class="nav-item active" data-section="dashboard">
       <span class="nav-icon">▦</span>
-      <span class="nav-label">Dashboard</span>
+      <span class="nav-label">Dashboard Carta</span>
     </a>
     <a class="nav-item" data-section="tabla">
       <span class="nav-icon">≡</span>
@@ -112,13 +112,13 @@
               <span class="abc-badge c">C</span>Cola
             </div>
           </div>
-          <div class="chart-wrap" style="height:320px">
+          <div class="chart-wrap ch-320">
             <canvas id="chart-pareto"></canvas>
           </div>
         </div>
         <div class="card">
           <h2>Distribución por categoría</h2>
-          <div class="chart-wrap" style="height:220px">
+          <div class="chart-wrap ch-220">
             <canvas id="chart-donut"></canvas>
           </div>
           <div id="cat-legend" class="cat-legend"></div>
@@ -132,14 +132,50 @@
       <div class="dash-section-label">Evolución</div>
       <div class="card">
         <h2>Evolución mensual de ventas</h2>
-        <div class="chart-wrap" style="height:300px">
+        <div class="chart-wrap ch-300">
           <canvas id="chart-evolucion"></canvas>
         </div>
       </div>
-      <div class="card">
-        <h2>Evolución por categoría — Top 6</h2>
-        <div class="chart-wrap" style="height:300px">
-          <canvas id="chart-evolucion-cat"></canvas>
+
+      <!-- TOP 10 / TOP 11-20 -->
+      <div class="two-col" id="dash-top-grid">
+        <div class="card">
+          <h2>Top 10 — posiciones 1 a 10</h2>
+          <div class="table-wrap">
+            <table class="metrics-table top-table" id="top10-table">
+              <thead>
+                <tr>
+                  <th style="text-align:center;width:32px">#</th>
+                  <th style="text-align:left">Producto</th>
+                  <th style="text-align:left">Categoría</th>
+                  <th>Ventas $</th>
+                  <th>Cant.</th>
+                  <th>% total</th>
+                  <th>Clase</th>
+                </tr>
+              </thead>
+              <tbody id="top10-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Top 20 — posiciones 11 a 20</h2>
+          <div class="table-wrap">
+            <table class="metrics-table top-table" id="top20-table">
+              <thead>
+                <tr>
+                  <th style="text-align:center;width:32px">#</th>
+                  <th style="text-align:left">Producto</th>
+                  <th style="text-align:left">Categoría</th>
+                  <th>Ventas $</th>
+                  <th>Cant.</th>
+                  <th>% total</th>
+                  <th>Clase</th>
+                </tr>
+              </thead>
+              <tbody id="top20-tbody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -148,7 +184,7 @@
       <div class="two-col">
         <div class="card">
           <h2>Ventas por categoría</h2>
-          <div class="chart-wrap" style="height:280px">
+          <div class="chart-wrap ch-280">
             <canvas id="chart-cat-bar"></canvas>
           </div>
         </div>
