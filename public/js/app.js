@@ -1477,6 +1477,35 @@ function renderSegCombined(data) {
 
 // ── INFLACIÓN CARTA ────────────────────────────────────────────────────────
 
+// Cache de datos INDEC (se carga una vez por sesión)
+let _indecData   = null;   // array de { period, year, month, mes, mom }
+let _indecLoaded = false;
+
+async function loadINDEC() {
+  if (_indecLoaded) return _indecData;
+  try {
+    const r = await fetch('/api/ipc').then(r => r.json());
+    _indecData = r.ok ? r.data : [];
+  } catch { _indecData = []; }
+  _indecLoaded = true;
+  return _indecData;
+}
+
+// Construye lookup period→mom desde el array INDEC  { "2024-01": 20.6, ... }
+function _indecLookup(indec) {
+  const map = {};
+  (indec || []).forEach(d => { map[d.period] = d.mom; });
+  return map;
+}
+
+// Convierte label de mes ("ENE 2024") al period INDEC ("2024-01")
+const _MES_NUM = { ENE:1,FEB:2,MAR:3,ABR:4,MAY:5,JUN:6,JUL:7,AGO:8,SEP:9,OCT:10,NOV:11,DIC:12 };
+function _labelToPeriod(label) {
+  const [m, y] = label.split(' ');
+  const num = _MES_NUM[m.slice(0,3).toUpperCase()];
+  return num ? `${y}-${String(num).padStart(2,'0')}` : null;
+}
+
 // Devuelve color CSS según el % y si es anual o mensual
 function _infColor(pct, isAnnual = false) {
   if (pct == null) return 'var(--muted)';
@@ -1494,60 +1523,110 @@ function _infColor(pct, isAnnual = false) {
   }
 }
 
-function renderInflacion(inf) {
+function renderInflacion(inf, indec) {
   if (!inf || !inf.labels || inf.labels.length === 0) return;
-  _renderInfAnnual(inf);
-  _renderInfChart(inf);
-  _renderInfTable(inf.months);
+  const lookup = _indecLookup(indec);
+  _renderInfAnnual(inf, indec, lookup);
+  _renderInfChart(inf, indec, lookup);
+  _renderInfTable(inf.months, lookup);
 }
 
-function _renderInfAnnual(inf) {
+function _renderInfAnnual(inf, indec, lookup) {
   const grid = document.getElementById('inf-annual-grid');
   if (!grid) return;
 
+  // Calcular acumulado anual INDEC (producto compuesto de MoM del año)
+  function indecAnnual(ano, meses) {
+    if (!indec || !indec.length) return null;
+    // Toma los meses del año que tengamos en INDEC
+    const months = indec.filter(d => d.year === ano && d.mom != null);
+    if (months.length === 0) return null;
+    // Filtrar solo los meses del período que cubre nuestra data
+    const coveredMonths = months.filter(d => {
+      const period = `${d.year}-${String(d.month).padStart(2,'0')}`;
+      // Solo tomar hasta el último mes que tenemos en restaurante
+      return true;
+    }).slice(0, meses);  // misma cantidad de meses que el restaurante
+    if (coveredMonths.length === 0) return null;
+    const compound = coveredMonths.reduce((acc, d) => acc * (1 + d.mom / 100), 1) - 1;
+    return parseFloat((compound * 100).toFixed(1));
+  }
+
+  function signStr(v) { return v != null ? (v >= 0 ? '+' : '') + v.toFixed(1) + '%' : '—'; }
+  function diffBlock(rest, ind) {
+    if (rest == null || ind == null) return '';
+    const diff = rest - ind;
+    const cls  = Math.abs(diff) < 2 ? 'var(--muted)' : diff > 0 ? '#e03c5a' : '#28a67e';
+    const lbl  = diff > 2 ? 'por encima del INDEC' : diff < -2 ? 'por debajo del INDEC' : 'en línea con INDEC';
+    return `<div class="inf-vs-indec" style="border-color:${cls}">
+      <span style="color:${cls};font-weight:700">${diff >= 0 ? '+' : ''}${diff.toFixed(1)} pp</span>
+      <span>${lbl}</span>
+    </div>`;
+  }
+
   const annualCards = inf.annual.map(y => {
     const color   = _infColor(y.cumulative, true);
-    const pctStr  = y.cumulative != null ? (y.cumulative >= 0 ? '+' : '') + y.cumulative.toFixed(1) + '%' : '—';
     const partial = y.meses < 12;
+    const indecCum = indecAnnual(y.ano, y.meses);
     return `
       <div class="inf-annual-card">
         <div class="inf-year-label">${y.ano}${partial ? ' <span class="inf-partial">en curso</span>' : ''}</div>
-        <div class="inf-cumulative" style="color:${color}">${pctStr}</div>
-        <div class="inf-year-sub">Inflación de carta${partial ? ' (parcial)' : ''}</div>
+        <div class="inf-cumulative" style="color:${color}">${signStr(y.cumulative)}</div>
+        <div class="inf-year-sub">Inflación carta${partial ? ' (parcial)' : ''}</div>
         <div class="inf-year-stats">
-          <div class="inf-stat"><span>Precio inicio</span><span>${fmt.pesosFull(y.firstPrice)}</span></div>
-          <div class="inf-stat"><span>Precio cierre</span><span>${fmt.pesosFull(y.lastPrice)}</span></div>
+          <div class="inf-stat"><span>Precio inicio</span><span>${y.firstPrice != null ? fmt.pesosFull(y.firstPrice) : '—'}</span></div>
+          <div class="inf-stat"><span>Precio cierre</span><span>${y.lastPrice != null ? fmt.pesosFull(y.lastPrice) : '—'}</span></div>
           <div class="inf-stat"><span>Prom. mensual</span>
-            <span style="color:${_infColor(y.avgMom)};font-weight:700">${y.avgMom != null ? (y.avgMom >= 0 ? '+' : '') + y.avgMom.toFixed(1) + '%' : '—'}</span>
+            <span style="color:${_infColor(y.avgMom)};font-weight:700">${signStr(y.avgMom)}</span>
           </div>
-          <div class="inf-stat"><span>Pico mensual</span>
-            <span style="color:${_infColor(y.maxMom)}">${y.maxMom != null ? '+' + y.maxMom.toFixed(1) + '%' : '—'}</span>
+          <div class="inf-stat inf-stat-indec"><span>INDEC acumulado</span>
+            <span style="color:${_infColor(indecCum, true)}">${signStr(indecCum)}</span>
           </div>
         </div>
+        ${diffBlock(y.cumulative, indecCum)}
       </div>`;
   }).join('');
 
-  // Card de acumulado histórico (solo si hay más de 1 año)
+  // Card total histórico
   let totalCard = '';
   if (inf.annual.length > 1 && inf.totalCum != null) {
-    const color  = _infColor(inf.totalCum, true);
-    const sign   = inf.totalCum >= 0 ? '+' : '';
+    const color = _infColor(inf.totalCum, true);
+    // INDEC total histórico: compuesto de todos los meses en el rango
+    let indecTotal = null;
+    if (indec && indec.length) {
+      const firstPeriod = _labelToPeriod(inf.firstLabel);
+      const lastPeriod  = _labelToPeriod(inf.lastLabel);
+      const range = indec.filter(d => d.period >= firstPeriod && d.period <= lastPeriod && d.mom != null);
+      if (range.length > 0) {
+        indecTotal = parseFloat(((range.reduce((a, d) => a * (1 + d.mom / 100), 1) - 1) * 100).toFixed(1));
+      }
+    }
     totalCard = `
       <div class="inf-annual-card inf-total-card">
         <div class="inf-year-label">Total histórico</div>
-        <div class="inf-cumulative" style="color:${color}">${sign}${inf.totalCum.toFixed(1)}%</div>
+        <div class="inf-cumulative" style="color:${color}">+${inf.totalCum.toFixed(1)}%</div>
         <div class="inf-year-sub">${inf.firstLabel} → ${inf.lastLabel}</div>
         <div class="inf-year-stats">
-          <div class="inf-stat"><span>Años</span><span>${inf.annual.length}</span></div>
-          <div class="inf-stat"><span>Meses</span><span>${inf.labels.length}</span></div>
+          <div class="inf-stat"><span>Años en base</span><span>${inf.annual.length}</span></div>
+          <div class="inf-stat inf-stat-indec"><span>INDEC mismo período</span>
+            <span style="color:${_infColor(indecTotal, true)}">${signStr(indecTotal)}</span>
+          </div>
         </div>
+        ${ inf.totalCum != null && indecTotal != null ? (() => {
+          const diff = inf.totalCum - indecTotal;
+          const cls  = diff > 5 ? '#e03c5a' : diff < -5 ? '#28a67e' : 'var(--muted)';
+          return `<div class="inf-vs-indec" style="border-color:${cls}">
+            <span style="color:${cls};font-weight:700">${diff >= 0 ? '+' : ''}${diff.toFixed(1)} pp</span>
+            <span>${diff > 5 ? 'La carta subió más que inflación' : diff < -5 ? 'La carta subió menos que inflación' : 'En línea con la inflación'}</span>
+          </div>`;
+        })() : ''}
       </div>`;
   }
 
   grid.innerHTML = annualCards + totalCard;
 }
 
-function _renderInfChart(inf) {
+function _renderInfChart(inf, indec, lookup) {
   const momColors = inf.mom.map(v => {
     if (v == null) return 'rgba(0,0,0,0)';
     const c = v < 0 ? '#4a9eff' : v < 3 ? '#28a67e' : v < 7 ? '#c8a84b' : v < 15 ? '#e07b39' : '#e03c5a';
@@ -1558,26 +1637,51 @@ function _renderInfChart(inf) {
     return v < 0 ? '#4a9eff' : v < 3 ? '#28a67e' : v < 7 ? '#c8a84b' : v < 15 ? '#e07b39' : '#e03c5a';
   });
 
-  upsertChart('chart-inflacion', {
-    data: {
-      labels: inf.labels,
-      datasets: [
-        {
-          type: 'line', label: 'Precio promedio ($)',
-          data: inf.avgPrices,
-          borderColor: '#4a9eff', backgroundColor: 'rgba(74,158,255,0.10)',
-          borderWidth: 2.5, pointRadius: 3,
-          pointBackgroundColor: '#4a9eff', pointBorderColor: '#fff', pointBorderWidth: 2,
-          tension: 0.3, fill: true, yAxisID: 'yPrice', order: 1,
-        },
-        {
-          type: 'bar', label: 'Variación MoM (%)',
-          data: inf.mom,
-          backgroundColor: momColors, borderColor: momBorders, borderWidth: 1,
-          borderRadius: 4, yAxisID: 'yMom', order: 2,
-        },
-      ],
+  // INDEC MoM alineado a las mismas etiquetas de nuestra carta
+  const indecMomData = inf.labels.map(label => {
+    const period = _labelToPeriod(label);
+    return (period && lookup && lookup[period] != null) ? lookup[period] : null;
+  });
+  const hasIndec = indecMomData.some(v => v != null);
+
+  const datasets = [
+    {
+      type: 'line', label: 'Precio promedio ($)',
+      data: inf.avgPrices,
+      borderColor: '#4a9eff', backgroundColor: 'rgba(74,158,255,0.10)',
+      borderWidth: 2.5, pointRadius: 3,
+      pointBackgroundColor: '#4a9eff', pointBorderColor: '#fff', pointBorderWidth: 2,
+      tension: 0.3, fill: true, yAxisID: 'yPrice', order: 1,
     },
+    {
+      type: 'bar', label: 'Carta MoM (%)',
+      data: inf.mom,
+      backgroundColor: momColors, borderColor: momBorders, borderWidth: 1,
+      borderRadius: 4, yAxisID: 'yMom', order: 3,
+    },
+  ];
+
+  if (hasIndec) {
+    datasets.push({
+      type: 'line', label: 'INDEC MoM (%)',
+      data: indecMomData,
+      borderColor: '#e03c5a',
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      borderDash: [5, 4],
+      pointRadius: 3,
+      pointBackgroundColor: '#e03c5a',
+      pointBorderColor: '#fff',
+      pointBorderWidth: 1.5,
+      tension: 0.3,
+      fill: false,
+      spanGaps: true,
+      yAxisID: 'yMom', order: 2,
+    });
+  }
+
+  upsertChart('chart-inflacion', {
+    data: { labels: inf.labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: true, aspectRatio: 3,
       interaction: { mode: 'index', intersect: false },
@@ -1588,7 +1692,9 @@ function _renderInfChart(inf) {
             if (ctx.dataset.yAxisID === 'yPrice')
               return ` Precio prom: ${fmt.pesosFull(ctx.parsed.y)}`;
             const v = ctx.parsed.y;
-            return v != null ? ` MoM: ${v >= 0 ? '+' : ''}${v.toFixed(1)}%` : null;
+            if (v == null) return null;
+            const prefix = ctx.dataset.label === 'INDEC MoM (%)' ? ' INDEC' : ' Carta';
+            return `${prefix}: ${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
           },
         }},
       },
@@ -1607,7 +1713,7 @@ function _renderInfChart(inf) {
   });
 }
 
-function _renderInfTable(months) {
+function _renderInfTable(months, lookup) {
   const tbody = document.getElementById('inf-monthly-tbody');
   if (!tbody || !months) return;
 
@@ -1629,11 +1735,34 @@ function _renderInfTable(months) {
           const title = m.momCob ? ` title="Cobertura: ${m.momCob}% de ventas del mes"` : '';
           return `<td style="color:${color};font-weight:600;${bg}"${title}>${sign}${m.mom.toFixed(1)}%</td>`;
         })();
+
+    // INDEC MoM para este período
+    const period    = _labelToPeriod(m.label);
+    const indecMom  = (lookup && period && lookup[period] != null) ? lookup[period] : null;
+    const indecTd   = indecMom == null
+      ? `<td style="color:var(--muted)">—</td>`
+      : (() => {
+          const color = _infColor(indecMom);
+          const sign  = indecMom >= 0 ? '+' : '';
+          return `<td style="color:${color}">${sign}${indecMom.toFixed(1)}%</td>`;
+        })();
+
+    // Diferencia en pp (carta − INDEC)
+    const diffTd = (m.mom != null && indecMom != null)
+      ? (() => {
+          const diff  = m.mom - indecMom;
+          const color = Math.abs(diff) < 1 ? 'var(--muted)' : diff > 0 ? '#e03c5a' : '#28a67e';
+          return `<td style="color:${color};font-weight:600">${diff >= 0 ? '+' : ''}${diff.toFixed(1)} pp</td>`;
+        })()
+      : `<td style="color:var(--muted)">—</td>`;
+
     return `
       <tr>
         <td style="text-align:left;font-weight:500;color:var(--text)">${m.label}</td>
         <td>${m.avgPrice != null ? fmt.pesosFull(m.avgPrice) : '—'}</td>
         ${momTd}
+        ${indecTd}
+        ${diffTd}
         ${pctCell(m.yoy)}
         ${pctCell(m.cumAnual)}
       </tr>`;
@@ -1668,7 +1797,7 @@ function renderAll(data) {
   renderBCG(data);
 
   // Inflación Carta
-  renderInflacion(data.inflacion);
+  renderInflacion(data.inflacion, _indecData);
 
   // Timestamp
   const now = new Date().toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' });
@@ -1711,9 +1840,19 @@ document.getElementById('btn-refresh').addEventListener('click', () => {
 });
 
 // Cuando el usuario navega a Seguimiento, recargar si hay productos
+// Cuando navega a Inflación, cargar INDEC si aún no se cargó y re-renderizar
 document.querySelectorAll('.nav-item').forEach(item => {
   if (item.dataset.section === 'seguimiento') {
     item.addEventListener('click', () => { if (segList.length > 0) loadSeguimiento(); }, { capture: true });
+  }
+  if (item.dataset.section === 'inflacion') {
+    item.addEventListener('click', async () => {
+      if (!_indecLoaded) {
+        await loadINDEC();
+        // Re-renderizar la sección con los datos INDEC recién cargados
+        if (rawData && rawData.inflacion) renderInflacion(rawData.inflacion, _indecData);
+      }
+    }, { capture: true });
   }
 });
 

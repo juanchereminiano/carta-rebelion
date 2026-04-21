@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const express   = require('express');
 const cors      = require('cors');
+const https     = require('https');
 const NodeCache = require('node-cache');
 
 const { fetchCartaData }  = require('./src/cartaSheets');
@@ -17,8 +18,69 @@ const {
   buildInflacion,
 } = require('./src/cartaTransform');
 
-const app   = express();
-const cache = new NodeCache({ stdTTL: parseInt(process.env.CACHE_TTL) || 600 });
+const app      = express();
+const cache    = new NodeCache({ stdTTL: parseInt(process.env.CACHE_TTL) || 600 });
+const ipcCache = new NodeCache({ stdTTL: 12 * 3600 }); // IPC INDEC: cache 12 h
+
+// ── Helper HTTP GET → JSON (sin dependencias extra) ─────────────────────────
+function httpsGetJSON(url, redirects = 3) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { timeout: 10000 }, res => {
+      if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location && redirects > 0) {
+        req.destroy();
+        httpsGetJSON(res.headers.location, redirects - 1).then(resolve).catch(reject);
+        return;
+      }
+      if (res.statusCode !== 200) {
+        reject(new Error(`HTTP ${res.statusCode} en ${url}`));
+        res.resume();
+        return;
+      }
+      let raw = '';
+      res.setEncoding('utf8');
+      res.on('data', c => raw += c);
+      res.on('end', () => {
+        try { resolve(JSON.parse(raw)); }
+        catch (e) { reject(new Error('JSON inválido: ' + e.message)); }
+      });
+    });
+    req.setTimeout(10000, () => { req.destroy(); reject(new Error('Timeout')); });
+    req.on('error', reject);
+  });
+}
+
+// ── IPC INDEC — datos.gob.ar ─────────────────────────────────────────────────
+// Series: IPC Nivel General - variación mensual (INDEC)
+const IPC_URL = 'https://apis.datos.gob.ar/series/api/series/'
+  + '?ids=148.3_INIVELNAL_DICI_M_26'
+  + '&limit=200&format=json&sort=asc';
+
+const MES_NAMES = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO',
+                   'JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+
+async function fetchIPC() {
+  const cached = ipcCache.get('ipc');
+  if (cached) return cached;
+
+  const json = await httpsGetJSON(IPC_URL);
+
+  const data = (json.data || [])
+    .filter(([, v]) => v != null)
+    .map(([date, value]) => {
+      const d = new Date(date + 'T12:00:00Z');
+      const m = d.getUTCMonth(); // 0-11
+      return {
+        period: `${d.getUTCFullYear()}-${String(m + 1).padStart(2, '0')}`,
+        year:   d.getUTCFullYear(),
+        month:  m + 1,
+        mes:    MES_NAMES[m],
+        mom:    parseFloat(value.toFixed(2)),
+      };
+    });
+
+  ipcCache.set('ipc', data);
+  return data;
+}
 
 app.use(cors());
 app.use(express.static('public'));
@@ -103,9 +165,22 @@ app.get('/api/meta', async (req, res) => {
   }
 });
 
+// IPC INDEC — datos oficiales (datos.gob.ar)
+app.get('/api/ipc', async (req, res) => {
+  try {
+    const data = await fetchIPC();
+    res.json({ ok: true, data, fuente: 'INDEC / datos.gob.ar', serie: '148.3_INIVELNAL_DICI_M_26' });
+  } catch (err) {
+    console.error('Error /api/ipc:', err.message);
+    // Falla silenciosa: devuelve array vacío para no romper el frontend
+    res.json({ ok: false, data: [], error: err.message });
+  }
+});
+
 // Limpiar cache
 app.post('/api/refresh', (req, res) => {
   cache.flushAll();
+  ipcCache.flushAll();   // también limpia el IPC para forzar refetch
   res.json({ ok: true });
 });
 

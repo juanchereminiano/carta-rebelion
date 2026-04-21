@@ -515,6 +515,27 @@ body {
 .inf-stat > span:first-child { color: var(--muted); }
 .inf-stat > span:last-child  { font-weight: 600; }
 
+.inf-stat-indec {
+  opacity: 0.8;
+}
+
+.inf-vs-indec {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  background: rgba(0,0,0,0.02);
+}
+.inf-vs-indec span:first-child {
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
 .inf-method-note {
   font-size: 0.67rem; color: var(--muted);
   font-style: italic; text-align: right;
