@@ -1619,14 +1619,25 @@ function _renderInfTable(months) {
     return `<td style="color:${color};font-weight:600;${bg}">${sign}${val.toFixed(1)}%</td>`;
   }
 
-  tbody.innerHTML = [...months].reverse().map(m => `
-    <tr>
-      <td style="text-align:left;font-weight:500;color:var(--text)">${m.label}</td>
-      <td>${fmt.pesosFull(m.avgPrice)}</td>
-      ${pctCell(m.mom)}
-      ${pctCell(m.yoy)}
-      ${pctCell(m.cumAnual)}
-    </tr>`).join('');
+  tbody.innerHTML = [...months].reverse().map(m => {
+    const momTd = m.mom == null
+      ? `<td style="color:var(--muted)">—</td>`
+      : (() => {
+          const color = _infColor(m.mom);
+          const sign  = m.mom >= 0 ? '+' : '';
+          const bg    = Math.abs(m.mom) > 10 ? `background:${color}18;` : '';
+          const title = m.momCob ? ` title="Cobertura: ${m.momCob}% de ventas del mes"` : '';
+          return `<td style="color:${color};font-weight:600;${bg}"${title}>${sign}${m.mom.toFixed(1)}%</td>`;
+        })();
+    return `
+      <tr>
+        <td style="text-align:left;font-weight:500;color:var(--text)">${m.label}</td>
+        <td>${m.avgPrice != null ? fmt.pesosFull(m.avgPrice) : '—'}</td>
+        ${momTd}
+        ${pctCell(m.yoy)}
+        ${pctCell(m.cumAnual)}
+      </tr>`;
+  }).join('');
 }
 
 // ── Render completo ────────────────────────────────────────────────────────

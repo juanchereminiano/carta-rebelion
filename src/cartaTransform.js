@@ -266,80 +266,147 @@ function buildBCGData(records) {
   });
 }
 
-// ── Inflación de carta ────────────────────────────────────────────────────────
-// Metodología: precio promedio mensual = ventas_totales / unidades_vendidas
-// Refleja cómo evoluciona el ticket promedio de la carta mes a mes.
-// Calcula: MoM (vs. mes anterior), YoY (vs. mismo mes año anterior),
-//          acumulado del año (vs. enero del mismo año) y resumen anual.
-// Usa TODOS los registros (sin filtros) para mostrar la historia completa.
+// ── Inflación de carta — metodología índice de precios ponderado ─────────────
+//
+// Para cada mes M:
+//   1. Precio promedio de cada producto p: avgPrice[p][M] = ventas[p][M] / cant[p][M]
+//   2. Variación de precio de p respecto al mes anterior:
+//        change[p] = avgPrice[p][M] / avgPrice[p][M-1] - 1
+//   3. Peso del producto en el mes actual:
+//        weight[p] = ventas[p][M] / Σ ventas[todos][M]
+//   4. Inflación mensual = Σ ( change[p] × weight[p] )
+//        Solo se incluyen productos que tienen precio en AMBOS meses.
+//        Productos nuevos (sin precio anterior) no distorsionan el índice.
+//
+// Lo mismo aplica para YoY (vs. mismo mes año anterior) y acumulado del año
+// (vs. primer mes del mismo año en la base).
+// Usa TODOS los registros sin filtrar.
+//
 function buildInflacion(records) {
-  // ── 1. Agrupar por año+mes ──────────────────────────────────────────────
-  const monthMap = {};
+  const EMPTY = { labels: [], avgPrices: [], mom: [], yoy: [], cumAnual: [], annual: [], totalCum: null, months: [] };
+
+  // ── 1. Agrupar por producto + mesKey ────────────────────────────────────
+  // prodData[producto][mesKey] = { ventas, cant }
+  const prodData  = {};
+  const keyMeta   = {};   // mesKey → { ano, mes }
+
   for (const r of records) {
-    if (!r.ano || !r.mes) continue;
+    if (!r.ano || !r.mes || !r.producto) continue;
     const dinero = r.dinero || 0;
     const cant   = r.cant   || 0;
-    if (cant <= 0) continue;
-    const key = `${r.ano}-${String(MES_ORDER.indexOf(r.mes)).padStart(2, '0')}`;
-    if (!monthMap[key]) monthMap[key] = { ano: r.ano, mes: r.mes, ventas: 0, cant: 0 };
-    monthMap[key].ventas += dinero;
-    monthMap[key].cant   += cant;
+    if (cant <= 0 || dinero <= 0) continue;
+    const mIdx = MES_ORDER.indexOf(r.mes);
+    if (mIdx < 0) continue;
+
+    const key = `${r.ano}-${String(mIdx).padStart(2, '0')}`;
+    if (!keyMeta[key]) keyMeta[key] = { ano: r.ano, mes: r.mes };
+    if (!prodData[r.producto]) prodData[r.producto] = {};
+    if (!prodData[r.producto][key]) prodData[r.producto][key] = { ventas: 0, cant: 0 };
+    prodData[r.producto][key].ventas += dinero;
+    prodData[r.producto][key].cant   += cant;
   }
 
-  const months = Object.entries(monthMap)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([, v]) => ({ ...v, avgPrice: v.ventas / v.cant }))
-    .filter(m => m.avgPrice > 0);
+  const allKeys = Object.keys(keyMeta).sort();
+  if (allKeys.length === 0) return EMPTY;
 
-  if (months.length === 0) {
-    return { labels: [], avgPrices: [], mom: [], yoy: [], cumAnual: [], annual: [], totalCum: null, months: [] };
+  // Precio promedio por producto por mes
+  for (const prod in prodData) {
+    for (const key in prodData[prod]) {
+      const m = prodData[prod][key];
+      m.price = m.cant > 0 ? m.ventas / m.cant : null;
+    }
   }
 
-  // ── 2. MoM (vs. mes anterior inmediato) ───────────────────────────────
-  months.forEach((m, i) => {
-    m.mom = i > 0 && months[i-1].avgPrice > 0
-      ? ((m.avgPrice / months[i-1].avgPrice) - 1) * 100
-      : null;
+  // Ventas totales del mes (todos los productos) — denominador del peso
+  const totalVentasByKey = {};
+  for (const prod in prodData) {
+    for (const [key, v] of Object.entries(prodData[prod])) {
+      totalVentasByKey[key] = (totalVentasByKey[key] || 0) + v.ventas;
+    }
+  }
+
+  // ── 2. Helper: inflación ponderada entre dos meses ───────────────────
+  // Compara los precios de cada producto en keyA vs keyB.
+  // Los pesos son las ventas de cada producto en el mes de referencia (keyB = "actual").
+  function weightedInflation(keyA, keyB) {
+    const totalB = totalVentasByKey[keyB] || 0;
+    if (totalB <= 0) return null;
+    let sumWeighted  = 0;
+    let sumWeights   = 0;
+    for (const prod in prodData) {
+      const b = prodData[prod][keyB];
+      const a = prodData[prod][keyA];
+      if (!b || !a || !b.price || !a.price || a.price <= 0) continue;
+      const change = (b.price / a.price - 1) * 100;
+      const weight = b.ventas / totalB;
+      sumWeighted += change * weight;
+      sumWeights  += weight;
+    }
+    // sumWeights = fracción del mes B cubierta por productos con precio previo.
+    // Retornamos null si la cobertura es menor al 10% (datos insuficientes).
+    return sumWeights >= 0.10 ? { inf: sumWeighted, cobertura: Math.round(sumWeights * 100) } : null;
+  }
+
+  // ── 3. Construir serie mensual ───────────────────────────────────────
+  const months = allKeys.map((key, i) => {
+    const { ano, mes } = keyMeta[key];
+
+    // Precio promedio simple del mes (para el gráfico de línea de referencia)
+    let tv = 0, tc = 0;
+    for (const prod in prodData) {
+      const m = prodData[prod][key];
+      if (m) { tv += m.ventas; tc += m.cant; }
+    }
+    const avgPrice = tc > 0 ? Math.round(tv / tc) : null;
+
+    // MoM: vs. mes anterior
+    let mom = null, momCob = null;
+    if (i > 0) {
+      const r = weightedInflation(allKeys[i - 1], key);
+      if (r) { mom = r.inf; momCob = r.cobertura; }
+    }
+
+    // YoY: vs. mismo mes del año anterior
+    const mIdx    = MES_ORDER.indexOf(mes);
+    const prevKey = `${ano - 1}-${String(mIdx).padStart(2, '0')}`;
+    let yoy = null;
+    if (keyMeta[prevKey]) {
+      const r = weightedInflation(prevKey, key);
+      if (r) yoy = r.inf;
+    }
+
+    return { key, ano, mes, avgPrice, mom, momCob, yoy, cumAnual: null };
   });
 
-  // ── 3. YoY (vs. mismo mes del año anterior) ───────────────────────────
-  const priceByYearMes = {};
-  months.forEach(m => { priceByYearMes[`${m.ano}__${m.mes}`] = m.avgPrice; });
-  months.forEach(m => {
-    const prev = priceByYearMes[`${m.ano - 1}__${m.mes}`];
-    m.yoy = prev ? ((m.avgPrice / prev) - 1) * 100 : null;
-  });
+  // ── 4. Acumulado del año (vs. primer mes del año en la base) ─────────
+  // Agrupa los meses por año y calcula la inflación acumulada desde el primero.
+  const byYear = {};
+  months.forEach(m => { (byYear[m.ano] = byYear[m.ano] || []).push(m); });
 
-  // ── 4. Acumulado del año (vs. primer mes del mismo año) ───────────────
-  const firstByYear = {};
-  months.forEach(m => { if (!firstByYear[m.ano]) firstByYear[m.ano] = m.avgPrice; });
-  months.forEach(m => {
-    const first = firstByYear[m.ano];
-    m.cumAnual = first > 0 ? ((m.avgPrice / first) - 1) * 100 : null;
-  });
+  for (const ms of Object.values(byYear)) {
+    const firstKey = ms[0].key;
+    ms[0].cumAnual = 0;
+    for (let i = 1; i < ms.length; i++) {
+      const r = weightedInflation(firstKey, ms[i].key);
+      ms[i].cumAnual = r ? r.inf : null;
+    }
+  }
 
-  // ── 5. Resumen por año ─────────────────────────────────────────────────
-  const annualMap = {};
-  months.forEach(m => {
-    if (!annualMap[m.ano]) annualMap[m.ano] = [];
-    annualMap[m.ano].push(m);
-  });
-
-  const annual = Object.entries(annualMap)
+  // ── 5. Resumen por año ───────────────────────────────────────────────
+  const annual = Object.entries(byYear)
     .sort(([a], [b]) => Number(a) - Number(b))
     .map(([ano, ms]) => {
-      const first    = ms[0].avgPrice;
-      const last     = ms[ms.length - 1].avgPrice;
+      const lastM    = ms[ms.length - 1];
+      const cumul    = lastM.cumAnual;
       const momValid = ms.filter(m => m.mom !== null);
-      const cumul    = first > 0 ? (last / first - 1) * 100 : null;
       const avgMom   = momValid.length > 0
         ? momValid.reduce((s, m) => s + m.mom, 0) / momValid.length : null;
       const maxMom   = momValid.length > 0
         ? Math.max(...momValid.map(m => m.mom)) : null;
       return {
         ano:        parseInt(ano),
-        firstPrice: Math.round(first),
-        lastPrice:  Math.round(last),
+        firstPrice: ms[0].avgPrice,
+        lastPrice:  lastM.avgPrice,
         cumulative: cumul != null ? parseFloat(cumul.toFixed(1)) : null,
         meses:      ms.length,
         avgMom:     avgMom != null ? parseFloat(avgMom.toFixed(1)) : null,
@@ -347,17 +414,18 @@ function buildInflacion(records) {
       };
     });
 
-  // ── 6. Acumulado histórico total ──────────────────────────────────────
-  const totalFirst = months[0].avgPrice;
-  const totalLast  = months[months.length - 1].avgPrice;
-  const totalCum   = totalFirst > 0
-    ? parseFloat(((totalLast / totalFirst - 1) * 100).toFixed(1)) : null;
+  // ── 6. Acumulado histórico total (primer mes → último mes) ───────────
+  let totalCum = null;
+  if (allKeys.length >= 2) {
+    const r = weightedInflation(allKeys[0], allKeys[allKeys.length - 1]);
+    if (r) totalCum = parseFloat(r.inf.toFixed(1));
+  }
 
   const round1 = n => n != null ? parseFloat(n.toFixed(1)) : null;
 
   return {
     labels:    months.map(m => `${m.mes.slice(0, 3)} ${m.ano}`),
-    avgPrices: months.map(m => Math.round(m.avgPrice)),
+    avgPrices: months.map(m => m.avgPrice),
     mom:       months.map(m => round1(m.mom)),
     yoy:       months.map(m => round1(m.yoy)),
     cumAnual:  months.map(m => round1(m.cumAnual)),
@@ -365,12 +433,12 @@ function buildInflacion(records) {
     totalCum,
     firstLabel: `${months[0].mes.slice(0,3)} ${months[0].ano}`,
     lastLabel:  `${months[months.length-1].mes.slice(0,3)} ${months[months.length-1].ano}`,
-    // Detalle mensual para la tabla (más reciente primero al renderizar)
     months: months.map(m => ({
       label:    `${m.mes.charAt(0) + m.mes.slice(1).toLowerCase()} ${m.ano}`,
       ano:      m.ano,
-      avgPrice: Math.round(m.avgPrice),
+      avgPrice: m.avgPrice,
       mom:      round1(m.mom),
+      momCob:   m.momCob,   // cobertura % (productos comparables / total)
       yoy:      round1(m.yoy),
       cumAnual: round1(m.cumAnual),
     })),
