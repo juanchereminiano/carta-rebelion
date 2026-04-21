@@ -270,10 +270,15 @@ function showToast(msg, duration = 3000) {
 }
 
 // ── Refresh status indicator ───────────────────────────────────────────────
-let _lastFetch    = null;   // timestamp de la última carga exitosa
-let _statusTimer  = null;   // interval que actualiza "hace X seg"
-let _autoRefresh  = null;   // interval del auto-refresh de 60s
-let _autoCountdown = 60;    // segundos restantes para el próximo auto-refresh
+let _autoRefresh   = null;   // interval del auto-refresh
+let _nextRefreshAt = null;   // Date de la próxima actualización automática
+
+const AUTO_REFRESH_MS = 10 * 60 * 1000;  // 10 minutos
+
+function _fmtTime(date) {
+  if (!date) return '';
+  return date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+}
 
 function setRefreshStatus(state) {
   const el = document.getElementById('refresh-status');
@@ -282,36 +287,12 @@ function setRefreshStatus(state) {
   if (state === 'loading') {
     el.textContent = 'Actualizando…';
   } else if (state === 'ok') {
-    _lastFetch = Date.now();
-    _autoCountdown = 60;
+    _nextRefreshAt = new Date(Date.now() + AUTO_REFRESH_MS);
     el.classList.add('ok');
-    _startStatusTick();
+    el.textContent = `✓ Actualizado · próximo ${_fmtTime(_nextRefreshAt)}`;
   } else if (state === 'error') {
     el.textContent = 'Error al cargar';
   }
-}
-
-const AUTO_REFRESH_MS = 10 * 60 * 1000;  // 10 minutos
-
-function _fmtCountdown(secs) {
-  if (secs <= 0) return 'ahora';
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return m > 0 ? `${m}m ${s}s` : `${s}s`;
-}
-
-function _startStatusTick() {
-  if (_statusTimer) clearInterval(_statusTimer);
-  _statusTimer = setInterval(() => {
-    const el = document.getElementById('refresh-status');
-    if (!el || !_lastFetch) return;
-    const secsAgo  = Math.round((Date.now() - _lastFetch) / 1000);
-    const secsLeft = Math.max(0, AUTO_REFRESH_MS / 1000 - secsAgo);
-    el.className   = 'refresh-status ok';
-    el.textContent = secsAgo < 5
-      ? '✓ Actualizado'
-      : `Actualizado hace ${_fmtCountdown(secsAgo)} · próximo en ${_fmtCountdown(secsLeft)}`;
-  }, 1000);
 }
 
 function _startAutoRefresh() {
