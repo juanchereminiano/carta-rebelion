@@ -8,14 +8,23 @@ const bcrypt = require('bcryptjs');
 // Roles disponibles y secciones accesibles
 const ROLE_SECTIONS = {
   admin:    ['dashboard', 'tabla', 'bcg', 'seguimiento', 'inflacion'],
+  socio:    ['dashboard', 'tabla', 'bcg', 'seguimiento', 'inflacion'],
   gerencia: ['dashboard', 'tabla', 'bcg', 'seguimiento', 'inflacion'],
   staff:    ['dashboard', 'tabla', 'seguimiento'],
 };
 
 const ROLE_LABELS = {
   admin:    'Admin',
+  socio:    'Socio',
   gerencia: 'Gerencia',
   staff:    'Staff',
+};
+
+const ROLE_CAN_REFRESH = {
+  admin:    true,
+  socio:    true,
+  gerencia: false,
+  staff:    false,
 };
 
 // ── Carga de usuarios ──────────────────────────────────────────────────────
@@ -86,7 +95,7 @@ function publicUser(user) {
     role:     user.role,
     roleLabel: ROLE_LABELS[user.role] || user.role,
     sections: ROLE_SECTIONS[user.role] || [],
-    canRefresh: user.role === 'admin',
+    canRefresh: ROLE_CAN_REFRESH[user.role] ?? false,
   };
 }
 
