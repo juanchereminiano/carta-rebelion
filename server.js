@@ -26,6 +26,8 @@ const {
   buildShiftEvolucion,
   buildHeatmap,
   buildTurnosKPIs,
+  buildSeasonStats,
+  buildWeekdayStats,
   buildCatalog,
 } = require('./src/ventasHorariosTransform');
 const auth = require('./src/auth');
@@ -265,14 +267,18 @@ app.get('/api/turnos', async (req, res) => {
     const dias  = parse('dias');
     const turno = req.query.turno || 'all';
 
-    const filtered = filterVentas(allRecords, { anos, meses, dias, turno });
-    const catalog  = buildCatalog(allRecords); // catalog siempre sin filtros
+    const filtered  = filterVentas(allRecords, { anos, meses, dias, turno });
+    // Estaciones: filtrar solo por año para tener visión completa de la temporada
+    const byYear    = filterVentas(allRecords, { anos, meses: ['all'], dias: ['all'], turno: 'all' });
+    const catalog   = buildCatalog(allRecords);
 
     res.json({
       kpis:           buildTurnosKPIs(filtered),
       hourlyStats:    buildHourlyStats(filtered),
       shiftEvolucion: buildShiftEvolucion(filtered),
       heatmap:        buildHeatmap(filtered),
+      seasonStats:    buildSeasonStats(byYear),
+      weekdayStats:   buildWeekdayStats(filtered),
       catalog,
     });
   } catch (err) {

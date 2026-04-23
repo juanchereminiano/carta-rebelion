@@ -171,6 +171,103 @@ function buildTurnosKPIs(records) {
   };
 }
 
+// ── Estaciones del año (Argentina) ───────────────────────────────────────────
+const SEASON_DEF = {
+  VERANO:    { label: 'Verano',    emoji: '🌞', meses: [12,1,2]  },
+  OTOÑO:     { label: 'Otoño',     emoji: '🍂', meses: [3,4,5]   },
+  INVIERNO:  { label: 'Invierno',  emoji: '❄️',  meses: [6,7,8]   },
+  PRIMAVERA: { label: 'Primavera', emoji: '🌸', meses: [9,10,11] },
+};
+const SEASON_ORDER = ['VERANO','OTOÑO','INVIERNO','PRIMAVERA'];
+
+function getSeason(mes) {
+  if ([12,1,2].includes(mes))  return 'VERANO';
+  if ([3,4,5].includes(mes))   return 'OTOÑO';
+  if ([6,7,8].includes(mes))   return 'INVIERNO';
+  return 'PRIMAVERA';
+}
+
+function buildSeasonStats(records) {
+  const acc = {};
+  for (const key of SEASON_ORDER) {
+    acc[key] = { venta: 0, ordenes: 0, dias: new Set() };
+  }
+
+  for (const r of records) {
+    const s = getSeason(r.mes);
+    acc[s].venta   += r.venta;
+    acc[s].ordenes += r.orden;
+    acc[s].dias.add(r.fecha);
+  }
+
+  const result = {};
+  const totalVenta = Object.values(acc).reduce((s, a) => s + a.venta, 0);
+
+  for (const key of SEASON_ORDER) {
+    const a = acc[key];
+    const dias = a.dias.size;
+    result[key] = {
+      key,
+      label:      SEASON_DEF[key].label,
+      emoji:      SEASON_DEF[key].emoji,
+      venta:      a.venta,
+      ordenes:    a.ordenes,
+      dias,
+      ventaDia:   dias > 0 ? a.venta   / dias : 0,
+      ordenesDia: dias > 0 ? a.ordenes / dias : 0,
+      ticketProm: a.ordenes > 0 ? a.venta / a.ordenes : 0,
+      pctTotal:   totalVenta > 0 ? parseFloat((a.venta / totalVenta * 100).toFixed(1)) : 0,
+    };
+  }
+  return result;
+}
+
+// ── Estadísticas por día de semana ────────────────────────────────────────────
+function buildWeekdayStats(records) {
+  // Paso 1: total por (fecha, diaSemana)
+  const dayMap = new Map();
+  for (const r of records) {
+    const key = `${r.fecha}|${r.diaSemana}`;
+    if (!dayMap.has(key)) {
+      dayMap.set(key, { diaSemana: r.diaSemana, diaSemanaIdx: r.diaSemanaIdx, venta: 0, ordenes: 0 });
+    }
+    const e = dayMap.get(key);
+    e.venta   += r.venta;
+    e.ordenes += r.orden;
+  }
+
+  // Paso 2: promedio por diaSemana
+  const wMap = new Map();
+  for (const d of dayMap.values()) {
+    if (!wMap.has(d.diaSemana)) {
+      wMap.set(d.diaSemana, { diaSemana: d.diaSemana, diaSemanaIdx: d.diaSemanaIdx, sumVenta: 0, sumOrdenes: 0, count: 0 });
+    }
+    const e = wMap.get(d.diaSemana);
+    e.sumVenta   += d.venta;
+    e.sumOrdenes += d.ordenes;
+    e.count++;
+  }
+
+  const totalVenta   = [...wMap.values()].reduce((s, e) => s + e.sumVenta,   0);
+  const totalOrdenes = [...wMap.values()].reduce((s, e) => s + e.sumOrdenes, 0);
+
+  const rows = [];
+  for (const e of wMap.values()) {
+    rows.push({
+      diaSemana:    e.diaSemana,
+      diaSemanaIdx: e.diaSemanaIdx,
+      avgVenta:     e.count > 0 ? e.sumVenta   / e.count : 0,
+      avgOrdenes:   e.count > 0 ? e.sumOrdenes / e.count : 0,
+      ticketProm:   e.sumOrdenes > 0 ? e.sumVenta / e.sumOrdenes : 0,
+      pctVenta:     totalVenta   > 0 ? parseFloat((e.sumVenta   / totalVenta   * 100).toFixed(1)) : 0,
+      pctOrdenes:   totalOrdenes > 0 ? parseFloat((e.sumOrdenes / totalOrdenes * 100).toFixed(1)) : 0,
+      count:        e.count,
+    });
+  }
+
+  return rows.sort((a, b) => a.diaSemanaIdx - b.diaSemanaIdx);
+}
+
 // ── Catálogo ──────────────────────────────────────────────────────────────────
 function buildCatalog(records) {
   const anosSet  = new Set();
@@ -196,5 +293,7 @@ module.exports = {
   buildShiftEvolucion,
   buildHeatmap,
   buildTurnosKPIs,
+  buildSeasonStats,
+  buildWeekdayStats,
   buildCatalog,
 };

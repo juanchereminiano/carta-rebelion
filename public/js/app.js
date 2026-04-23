@@ -2543,8 +2543,11 @@ async function loadTurnosData() {
       initTurnosCatalog(data.catalog);
     }
 
+    _turLastData = data;
+    renderSeasonKPIs(data.seasonStats);
     renderTurnosKPIs(data.kpis);
-    renderHorlyChart(data.hourlyStats);
+    renderWeekdayTable(data.weekdayStats, turHoraMetric);
+    renderHorlyChart(data.hourlyStats, turHoraMetric);
     renderShiftEvolucion(data.shiftEvolucion);
     renderHeatmap(data.heatmap);
   } catch (e) {
@@ -2594,6 +2597,126 @@ function initTurnosCatalog(catalog) {
 
   // Apply button
   document.getElementById('tur-btn-apply')?.addEventListener('click', loadTurnosData);
+
+  // Metric toggle — gráfico por hora
+  document.querySelectorAll('#tur-hora-ventas, #tur-hora-ordenes').forEach(btn => {
+    btn.addEventListener('click', () => {
+      turHoraMetric = btn.dataset.metric;
+      document.querySelectorAll('#tur-hora-ventas, #tur-hora-ordenes').forEach(b => b.classList.toggle('active', b === btn));
+      if (_turLastData) {
+        renderHorlyChart(_turLastData.hourlyStats, turHoraMetric);
+        renderWeekdayTable(_turLastData.weekdayStats, turHoraMetric);
+      }
+    });
+  });
+
+  // Metric toggle — tabla por día de semana
+  document.querySelectorAll('#tur-weekday-ventas, #tur-weekday-ordenes').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const m = btn.dataset.metric;
+      document.querySelectorAll('#tur-weekday-ventas, #tur-weekday-ordenes').forEach(b => b.classList.toggle('active', b === btn));
+      if (_turLastData) renderWeekdayTable(_turLastData.weekdayStats, m);
+    });
+  });
+}
+
+// Métrica activa en gráfico por hora y tabla por día
+let turHoraMetric = 'ventas';
+let _turLastData = null; // para re-renderizar al cambiar métrica
+
+// ── Eje Y: formato millones/miles ──────────────────────────────────────────
+function fmtM(v) {
+  const abs = Math.abs(v);
+  if (abs >= 1_000_000) return '$' + (v / 1_000_000).toFixed(1) + 'M';
+  if (abs >= 1_000)     return '$' + Math.round(v / 1_000) + 'k';
+  return '$' + v;
+}
+
+// ── Estaciones ─────────────────────────────────────────────────────────────
+const SEASON_ORDER_FRONT = ['VERANO','OTOÑO','INVIERNO','PRIMAVERA'];
+
+function renderSeasonKPIs(seasonStats) {
+  const grid = document.getElementById('tur-season-grid');
+  if (!grid || !seasonStats) return;
+
+  const fmt  = n => n >= 1_000_000 ? '$' + (n/1_000_000).toFixed(2) + 'M' : '$' + Math.round(n).toLocaleString('es-AR');
+  const fmtN = n => Math.round(n).toLocaleString('es-AR');
+
+  // Determinar mejor y peor estación
+  const vals  = SEASON_ORDER_FRONT.map(k => seasonStats[k]?.venta || 0);
+  const maxV  = Math.max(...vals);
+  const minV  = Math.min(...vals.filter(v => v > 0));
+
+  grid.innerHTML = SEASON_ORDER_FRONT.map(key => {
+    const s = seasonStats[key];
+    if (!s) return '';
+    const isBest  = s.venta === maxV && maxV > 0;
+    const isWorst = s.venta === minV && minV < maxV;
+    return `
+      <div class="season-card ${isBest ? 'season-best' : isWorst ? 'season-worst' : ''}">
+        <div class="season-header">
+          <span class="season-emoji">${s.emoji}</span>
+          <div>
+            <div class="season-name">${s.label}</div>
+            <div class="season-pct">${s.pctTotal}% del año</div>
+          </div>
+          ${isBest  ? '<span class="season-badge best">↑ Top</span>'  : ''}
+          ${isWorst ? '<span class="season-badge worst">↓ Bajo</span>' : ''}
+        </div>
+        <div class="season-venta">${fmt(s.venta)}</div>
+        <div class="season-metrics">
+          <div class="season-metric"><span>Prom/día</span><strong>${fmt(s.ventaDia)}</strong></div>
+          <div class="season-metric"><span>Órdenes/día</span><strong>${fmtN(s.ordenesDia)}</strong></div>
+          <div class="season-metric"><span>Ticket</span><strong>${fmt(s.ticketProm)}</strong></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ── Tabla por día de semana ────────────────────────────────────────────────
+function renderWeekdayTable(weekdayStats, metric = 'ventas') {
+  const tbody   = document.getElementById('tur-weekday-tbody');
+  const insight = document.getElementById('tur-weekday-insight');
+  if (!tbody || !weekdayStats || !weekdayStats.length) return;
+
+  const fmt  = n => n >= 1_000_000 ? '$' + (n/1_000_000).toFixed(2) + 'M' : '$' + Math.round(n).toLocaleString('es-AR');
+  const fmtN = n => Math.round(n).toLocaleString('es-AR');
+
+  // Ordenar por métrica seleccionada para calcular semáforos
+  const byMetric = [...weekdayStats].sort((a, b) =>
+    metric === 'ordenes' ? b.avgOrdenes - a.avgOrdenes : b.avgVenta - a.avgVenta
+  );
+  const topSet    = new Set(byMetric.slice(0, 2).map(d => d.diaSemana));
+  const bottomSet = new Set(byMetric.slice(-2).map(d => d.diaSemana));
+
+  function semaforo(dia) {
+    if (topSet.has(dia))    return '<span class="sema sema-green">🟢 Alto</span>';
+    if (bottomSet.has(dia)) return '<span class="sema sema-red">🔴 Bajo</span>';
+    return '<span class="sema sema-yellow">🟡 Medio</span>';
+  }
+
+  tbody.innerHTML = weekdayStats.map(d => `
+    <tr>
+      <td style="text-align:left;font-weight:600">${DIA_LABEL_MAP[d.diaSemana] || d.diaSemana}</td>
+      <td>${fmt(d.avgVenta)}</td>
+      <td>${fmtN(d.avgOrdenes)}</td>
+      <td>${fmt(d.ticketProm)}</td>
+      <td>${metric === 'ordenes' ? d.pctOrdenes : d.pctVenta}%</td>
+      <td style="text-align:left">${semaforo(d.diaSemana)}</td>
+    </tr>
+  `).join('');
+
+  // Insight automático: peor día
+  if (insight && byMetric.length > 0) {
+    const worst = byMetric[byMetric.length - 1];
+    const worstName = DIA_LABEL_MAP[worst.diaSemana] || worst.diaSemana;
+    const pct = metric === 'ordenes' ? worst.pctOrdenes : worst.pctVenta;
+    const val = metric === 'ordenes'
+      ? `${fmtN(worst.avgOrdenes)} órdenes promedio`
+      : `${fmt(worst.avgVenta)} promedio`;
+    insight.innerHTML = `💡 El día más débil es el <strong>${worstName}</strong> — representa el <strong>${pct}%</strong> de la semana con ${val}.`;
+  }
 }
 
 function renderTurnosKPIs(kpis) {
@@ -2611,17 +2734,19 @@ function renderTurnosKPIs(kpis) {
   `;
 }
 
-function renderHorlyChart(hourlyStats) {
+function renderHorlyChart(hourlyStats, metric = 'ventas') {
   if (!hourlyStats || !hourlyStats.length) return;
   const ctx = document.getElementById('chart-tur-hora');
   if (!ctx) return;
 
-  // Find top 3 hours by ventaAvg for peak highlighting
-  const sorted    = [...hourlyStats].sort((a, b) => b.ventaAvg - a.ventaAvg);
+  const isVentas = metric !== 'ordenes';
+  const getValue = h => isVentas ? h.ventaAvg : h.ordenAvg;
+
+  const sorted    = [...hourlyStats].sort((a, b) => getValue(b) - getValue(a));
   const peakHours = new Set(sorted.slice(0, 3).map(h => h.hora));
 
   const labels = hourlyStats.map(h => h.label);
-  const values = hourlyStats.map(h => h.ventaAvg);
+  const values = hourlyStats.map(getValue);
   const colors = hourlyStats.map(h =>
     peakHours.has(h.hora) ? TUR_PEAK_COLOR :
     h.turno === 'DIA'     ? TUR_DIA_COLOR  : TUR_NOCHE_COLOR
@@ -2633,7 +2758,7 @@ function renderHorlyChart(hourlyStats) {
     data: {
       labels,
       datasets: [{
-        label: 'Venta promedio',
+        label: isVentas ? 'Venta promedio' : 'Órdenes promedio',
         data: values,
         backgroundColor: colors,
         borderRadius: 4,
@@ -2645,14 +2770,16 @@ function renderHorlyChart(hourlyStats) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: ctx => '$' + Math.round(ctx.parsed.y).toLocaleString('es-AR'),
+            label: c => isVentas
+              ? fmtM(c.parsed.y)
+              : Math.round(c.parsed.y).toLocaleString('es-AR') + ' órdenes',
           }
         }
       },
       scales: {
         x: { grid: { display: false } },
         y: {
-          ticks: { callback: v => '$' + Math.round(v / 1000) + 'k' },
+          ticks: { callback: v => isVentas ? fmtM(v) : Math.round(v) },
           grid: { color: 'rgba(0,0,0,0.05)' }
         }
       }
@@ -2704,7 +2831,7 @@ function renderShiftEvolucion(data) {
       },
       scales: {
         x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } },
-        y: { ticks: { callback: v => '$' + Math.round(v / 1000) + 'k' }, grid: { color: 'rgba(0,0,0,0.05)' } }
+        y: { ticks: { callback: v => fmtM(v) }, grid: { color: 'rgba(0,0,0,0.05)' } }
       }
     }
   });

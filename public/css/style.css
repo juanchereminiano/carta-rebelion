@@ -1282,6 +1282,65 @@ body {
 }
 
 /* ── Turnos & Horarios ───────────────────────────────────────────────────── */
+
+/* Cards de estación */
+.tur-season-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--gap);
+  margin-bottom: var(--gap);
+}
+@media (max-width: 900px) { .tur-season-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 500px) { .tur-season-grid { grid-template-columns: 1fr; } }
+
+.season-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  transition: box-shadow 0.15s;
+}
+.season-card.season-best  { border-color: #c8a84b; box-shadow: 0 0 0 2px rgba(200,168,75,0.18); }
+.season-card.season-worst { border-color: #e0dbd2; opacity: 0.85; }
+
+.season-header {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+}
+.season-emoji { font-size: 1.5rem; line-height: 1; }
+.season-name  { font-weight: 700; font-size: 0.85rem; }
+.season-pct   { font-size: 0.68rem; color: var(--muted); }
+.season-badge {
+  margin-left: auto;
+  font-size: 0.6rem; font-weight: 700; padding: 2px 7px;
+  border-radius: 10px; white-space: nowrap;
+}
+.season-badge.best  { background: rgba(200,168,75,0.15); color: #7a5c00; }
+.season-badge.worst { background: rgba(160,160,160,0.12); color: var(--muted); }
+
+.season-venta {
+  font-size: 1.35rem; font-weight: 700; color: var(--text);
+  margin-bottom: 8px;
+}
+.season-metrics {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.season-metric {
+  font-size: 0.7rem; color: var(--muted);
+  display: flex; flex-direction: column; gap: 1px;
+}
+.season-metric strong { color: var(--text); font-size: 0.75rem; }
+
+/* Tabla día de semana */
+.sema { font-size: 0.75rem; }
+.tur-insight {
+  margin-top: 12px; padding: 10px 14px;
+  background: rgba(43,94,173,0.06);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  font-size: 0.82rem; color: var(--muted);
+}
+.tur-insight strong { color: var(--text); }
+
 .tur-kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));

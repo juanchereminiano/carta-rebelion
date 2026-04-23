@@ -455,17 +455,53 @@
         </div>
       </div>
 
-      <!-- KPI cards -->
+      <!-- Estaciones del año -->
+      <div id="tur-season-grid" class="tur-season-grid"></div>
+
+      <!-- KPI cards (filtros completos) -->
       <div id="tur-kpi-grid" class="tur-kpi-grid"></div>
+
+      <!-- Análisis por día de semana -->
+      <div class="card">
+        <div class="card-header-row">
+          <h2>Rendimiento por día de semana</h2>
+          <div class="filter-chips metric-toggle">
+            <button class="chip active" id="tur-weekday-ventas"  data-metric="ventas">$ Ventas</button>
+            <button class="chip"        id="tur-weekday-ordenes" data-metric="ordenes">Órdenes</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="metrics-table" id="tur-weekday-table">
+            <thead>
+              <tr>
+                <th style="text-align:left">Día</th>
+                <th>Prom. diario</th>
+                <th>Prom. órdenes</th>
+                <th>Ticket prom.</th>
+                <th>% semana</th>
+                <th style="text-align:left">Semáforo</th>
+              </tr>
+            </thead>
+            <tbody id="tur-weekday-tbody"></tbody>
+          </table>
+        </div>
+        <div id="tur-weekday-insight" class="tur-insight"></div>
+      </div>
 
       <!-- Ventas por hora -->
       <div class="card">
         <div class="card-header-row">
-          <h2>Ventas promedio por hora</h2>
-          <div class="tur-legend">
-            <span class="tur-dot tur-dot-dia"></span>DIA (7–16)
-            <span class="tur-dot tur-dot-noche"></span>NOCHE (17–6)
-            <span class="tur-dot tur-dot-peak"></span>Hora pico
+          <h2>Promedio por hora</h2>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div class="filter-chips metric-toggle">
+              <button class="chip active" id="tur-hora-ventas"  data-metric="ventas">$ Ventas</button>
+              <button class="chip"        id="tur-hora-ordenes" data-metric="ordenes">Órdenes</button>
+            </div>
+            <div class="tur-legend">
+              <span class="tur-dot tur-dot-dia"></span>DIA
+              <span class="tur-dot tur-dot-noche"></span>NOCHE
+              <span class="tur-dot tur-dot-peak"></span>Pico
+            </div>
           </div>
         </div>
         <div class="chart-wrap" style="height:280px">
