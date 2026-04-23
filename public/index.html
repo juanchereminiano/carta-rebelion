@@ -457,15 +457,24 @@
     <div class="modal-body">
       <div class="modal-field">
         <label>Contraseña actual</label>
-        <input type="password" id="chpass-current" placeholder="••••••••" autocomplete="current-password" />
+        <div class="pass-wrap">
+          <input type="password" id="chpass-current" placeholder="Tu contraseña actual" autocomplete="off" />
+          <button type="button" class="pass-toggle" data-target="chpass-current">👁</button>
+        </div>
       </div>
       <div class="modal-field">
         <label>Nueva contraseña</label>
-        <input type="password" id="chpass-new" placeholder="Mín. 6 caracteres" autocomplete="new-password" />
+        <div class="pass-wrap">
+          <input type="password" id="chpass-new" placeholder="Mín. 6 caracteres" autocomplete="new-password" />
+          <button type="button" class="pass-toggle" data-target="chpass-new">👁</button>
+        </div>
       </div>
       <div class="modal-field">
         <label>Confirmar nueva contraseña</label>
-        <input type="password" id="chpass-confirm" placeholder="Repetir contraseña" autocomplete="new-password" />
+        <div class="pass-wrap">
+          <input type="password" id="chpass-confirm" placeholder="Repetir contraseña" autocomplete="new-password" />
+          <button type="button" class="pass-toggle" data-target="chpass-confirm">👁</button>
+        </div>
       </div>
       <div id="chpass-error" class="modal-error" style="display:none"></div>
       <div id="chpass-ok" class="modal-success" style="display:none">✓ Contraseña actualizada</div>
@@ -527,7 +536,10 @@
       <p id="reset-user-label" style="font-size:0.85rem;color:var(--muted);margin-bottom:14px"></p>
       <div class="modal-field">
         <label>Nueva contraseña</label>
-        <input type="text" id="reset-new-pass" placeholder="Escribí la nueva contraseña" />
+        <div class="pass-wrap">
+          <input type="password" id="reset-new-pass" placeholder="Escribí la nueva contraseña" autocomplete="off" />
+          <button type="button" class="pass-toggle" data-target="reset-new-pass">👁</button>
+        </div>
       </div>
       <div id="reset-error" class="modal-error" style="display:none"></div>
       <div id="reset-ok" class="modal-success" style="display:none">✓ Contraseña reseteada. Comunicásela al usuario.</div>

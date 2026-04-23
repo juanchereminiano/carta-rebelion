@@ -336,6 +336,19 @@ body {
   border-radius: 8px; color: #c0334f; font-size: 0.8rem;
   margin-top: 4px;
 }
+/* Campos de contraseña con toggle */
+.pass-wrap {
+  position: relative; display: flex; align-items: center;
+}
+.pass-wrap input { flex: 1; padding-right: 38px; }
+.pass-toggle {
+  position: absolute; right: 8px;
+  background: none; border: none; cursor: pointer;
+  font-size: 1rem; opacity: 0.45; padding: 4px;
+  transition: opacity 0.15s;
+}
+.pass-toggle:hover { opacity: 0.85; }
+
 .modal-success {
   padding: 9px 12px; background: rgba(40,166,126,0.09);
   border: 1px solid rgba(40,166,126,0.2);

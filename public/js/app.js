@@ -112,6 +112,15 @@ function initModals() {
       if (e.target === overlay) closeModal(overlay.id);
     });
   });
+  // Toggle ver/ocultar contraseña
+  document.querySelectorAll('.pass-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const inp = document.getElementById(btn.dataset.target);
+      if (!inp) return;
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+      btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+    });
+  });
 
   // ── Cambiar contraseña ──────────────────────────────────────────────────
   document.getElementById('chpass-submit').addEventListener('click', async () => {
