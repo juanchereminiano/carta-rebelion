@@ -8,9 +8,9 @@ const path   = require('path');
 
 // ── Roles ──────────────────────────────────────────────────────────────────
 const ROLE_SECTIONS = {
-  admin:    ['dashboard', 'tabla', 'bcg', 'seguimiento', 'inflacion'],
-  socio:    ['dashboard', 'tabla', 'bcg', 'seguimiento', 'inflacion'],
-  gerencia: ['dashboard', 'tabla', 'bcg', 'seguimiento', 'inflacion'],
+  admin:    ['dashboard', 'tabla', 'bcg', 'seguimiento', 'inflacion', 'turnos'],
+  socio:    ['dashboard', 'tabla', 'bcg', 'seguimiento', 'inflacion', 'turnos'],
+  gerencia: ['dashboard', 'tabla', 'bcg', 'seguimiento', 'inflacion', 'turnos'],
   staff:    ['dashboard', 'tabla', 'seguimiento'],
 };
 const ROLE_LABELS = {

@@ -40,6 +40,10 @@
       <span class="nav-icon">%</span>
       <span class="nav-label">Inflación Carta</span>
     </a>
+    <a class="nav-item" data-section="turnos">
+      <span class="nav-icon">⏱</span>
+      <span class="nav-label">Turnos & Horarios</span>
+    </a>
     <a class="nav-item nav-item-disabled" data-section="cmv">
       <span class="nav-icon">$</span>
       <span class="nav-label">CMV <span class="soon-badge">Pronto</span></span>
@@ -429,6 +433,63 @@
         <div class="coming-icon">₱</div>
         <h2 style="color:var(--text);font-size:1.1rem;text-transform:none;letter-spacing:0;margin:0">Ningún producto seleccionado</h2>
         <p>Buscá un producto arriba para ver la evolución de su precio mes a mes.</p>
+      </div>
+
+    </section>
+
+    <!-- TURNOS & HORARIOS ──────────────────────────────────────────────── -->
+    <section id="section-turnos" class="page-section">
+
+      <!-- Filtros propios -->
+      <div class="card seg-search-card">
+        <div class="card-header-row">
+          <h2>Filtros</h2>
+          <span class="seg-hint">Año, mes, día de semana y turno</span>
+        </div>
+        <div class="seg-filters" style="flex-wrap:wrap">
+          <div id="tur-ms-ano" class="ms-wrap"></div>
+          <div id="tur-ms-mes" class="ms-wrap"></div>
+          <div id="tur-ms-dia" class="ms-wrap"></div>
+          <div id="tur-ms-turno" class="ms-wrap"></div>
+          <button id="tur-btn-apply" class="seg-apply-btn">Ver datos</button>
+        </div>
+      </div>
+
+      <!-- KPI cards -->
+      <div id="tur-kpi-grid" class="tur-kpi-grid"></div>
+
+      <!-- Ventas por hora -->
+      <div class="card">
+        <div class="card-header-row">
+          <h2>Ventas promedio por hora</h2>
+          <div class="tur-legend">
+            <span class="tur-dot tur-dot-dia"></span>DIA (7–16)
+            <span class="tur-dot tur-dot-noche"></span>NOCHE (17–6)
+            <span class="tur-dot tur-dot-peak"></span>Hora pico
+          </div>
+        </div>
+        <div class="chart-wrap" style="height:280px">
+          <canvas id="chart-tur-hora"></canvas>
+        </div>
+      </div>
+
+      <!-- Evolución DIA vs NOCHE -->
+      <div class="card">
+        <div class="card-header-row">
+          <h2>Evolución mensual — DIA vs NOCHE</h2>
+        </div>
+        <div class="chart-wrap" style="height:280px">
+          <canvas id="chart-tur-shift"></canvas>
+        </div>
+      </div>
+
+      <!-- Mapa de calor -->
+      <div class="card">
+        <div class="card-header-row">
+          <h2>Mapa de calor — promedio diario por mes y día</h2>
+          <span style="font-size:0.72rem;color:var(--muted)">Promedio de ventas del día · sin filtros de día/turno</span>
+        </div>
+        <div id="tur-heatmap" class="tur-heatmap-wrap"></div>
       </div>
 
     </section>

@@ -668,6 +668,7 @@ const SECTION_TITLES = {
   bcg:         'Matriz BCG',
   inflacion:   'Inflación Carta',
   seguimiento: 'Seguimiento',
+  turnos:      'Turnos & Horarios',
   cmv:         'CMV',
 };
 
@@ -2483,6 +2484,7 @@ document.getElementById('btn-refresh').addEventListener('click', () => {
 
 // Cuando el usuario navega a Seguimiento, recargar si hay productos
 // Cuando navega a Inflación, cargar INDEC si aún no se cargó y re-renderizar
+// Cuando navega a Turnos, cargar datos si aún no se cargaron
 document.querySelectorAll('.nav-item').forEach(item => {
   if (item.dataset.section === 'seguimiento') {
     item.addEventListener('click', () => { if (segList.length > 0) loadSeguimiento(); }, { capture: true });
@@ -2496,7 +2498,280 @@ document.querySelectorAll('.nav-item').forEach(item => {
       if (infProdList.length > 0) loadInfProdData();
     }, { capture: true });
   }
+  if (item.dataset.section === 'turnos') {
+    item.addEventListener('click', () => {
+      if (!turCatalog) loadTurnosData();
+    }, { capture: true });
+  }
 });
+
+// ── Turnos & Horarios ──────────────────────────────────────────────────────
+const TUR_DIA_COLOR   = '#4a9eff';
+const TUR_NOCHE_COLOR = '#2b5ead';
+const TUR_PEAK_COLOR  = '#c8a84b';
+
+const DIA_LABEL_MAP = {
+  LUNES:'Lunes', MARTES:'Martes', MIERCOLES:'Miércoles',
+  JUEVES:'Jueves', VIERNES:'Viernes', SABADO:'Sábado', DOMINGO:'Domingo'
+};
+const MES_LABEL_MAP = {
+  ENERO:'Ene', FEBRERO:'Feb', MARZO:'Mar', ABRIL:'Abr', MAYO:'May', JUNIO:'Jun',
+  JULIO:'Jul', AGOSTO:'Ago', SEPTIEMBRE:'Sep', OCTUBRE:'Oct', NOVIEMBRE:'Nov', DICIEMBRE:'Dic'
+};
+const MES_ORDER_TUR = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+const DIA_ORDER_TUR = ['LUNES','MARTES','MIERCOLES','JUEVES','VIERNES','SABADO','DOMINGO'];
+
+let turState = { anos:['all'], meses:['all'], dias:['all'], turno:'all' };
+let turCatalog = null;
+let turMsAno, turMsMes, turMsDia, turMsTurno;
+
+async function loadTurnosData() {
+  const params = new URLSearchParams();
+  if (turState.anos[0]  !== 'all') params.set('anos',  turState.anos.join(','));
+  if (turState.meses[0] !== 'all') params.set('meses', turState.meses.join(','));
+  if (turState.dias[0]  !== 'all') params.set('dias',  turState.dias.join(','));
+  if (turState.turno    !== 'all') params.set('turno', turState.turno);
+
+  try {
+    const res  = await fetch('/api/turnos?' + params.toString());
+    const data = await res.json();
+    if (!res.ok) { console.error('Error /api/turnos:', data.error); return; }
+
+    // Catalog (only on first load)
+    if (!turCatalog) {
+      turCatalog = data.catalog;
+      initTurnosCatalog(data.catalog);
+    }
+
+    renderTurnosKPIs(data.kpis);
+    renderHorlyChart(data.hourlyStats);
+    renderShiftEvolucion(data.shiftEvolucion);
+    renderHeatmap(data.heatmap);
+  } catch (e) {
+    console.error('Error loadTurnosData:', e);
+  }
+}
+
+function initTurnosCatalog(catalog) {
+  // Año
+  turMsAno = new MultiSelect({
+    container: document.getElementById('tur-ms-ano'),
+    label: 'Año',
+    onChange: vals => { turState.anos = vals.length ? vals : ['all']; },
+  });
+  turMsAno.setOptions(catalog.anos.map(a => ({ value: a, text: a })));
+
+  // Mes
+  turMsMes = new MultiSelect({
+    container: document.getElementById('tur-ms-mes'),
+    label: 'Mes',
+    onChange: vals => { turState.meses = vals.length ? vals : ['all']; },
+  });
+  turMsMes.setOptions(catalog.meses.map(m => ({ value: m, text: MES_LABEL_MAP[m] || m })));
+
+  // Día de semana
+  const diasDisp = DIA_ORDER_TUR.filter(d => catalog.dias.includes(d));
+  turMsDia = new MultiSelect({
+    container: document.getElementById('tur-ms-dia'),
+    label: 'Día',
+    onChange: vals => { turState.dias = vals.length ? vals : ['all']; },
+  });
+  turMsDia.setOptions(diasDisp.map(d => ({ value: d, text: DIA_LABEL_MAP[d] || d })));
+
+  // Turno — single selection via onChange: tomar solo el primer valor no-all
+  turMsTurno = new MultiSelect({
+    container: document.getElementById('tur-ms-turno'),
+    label: 'Turno',
+    onChange: vals => {
+      const nonAll = vals.filter(v => v !== 'all');
+      turState.turno = nonAll.length ? nonAll[0] : 'all';
+    },
+  });
+  turMsTurno.setOptions([
+    { value: 'DIA',   text: 'Día' },
+    { value: 'NOCHE', text: 'Noche' },
+  ]);
+
+  // Apply button
+  document.getElementById('tur-btn-apply')?.addEventListener('click', loadTurnosData);
+}
+
+function renderTurnosKPIs(kpis) {
+  const grid = document.getElementById('tur-kpi-grid');
+  if (!grid || !kpis) return;
+  const fmtP = n => n != null ? '$' + Math.round(n).toLocaleString('es-AR') : '—';
+  const fmtN = n => n != null ? Math.round(n).toLocaleString('es-AR') : '—';
+  grid.innerHTML = `
+    <div class="summary-card"><div class="sc-label">Venta total</div><div class="sc-value">${fmtP(kpis.totalVenta)}</div></div>
+    <div class="summary-card"><div class="sc-label">Turno DIA</div><div class="sc-value">${fmtP(kpis.totalDia)}<small class="sc-sub"> ${kpis.pctDia}%</small></div></div>
+    <div class="summary-card"><div class="sc-label">Turno NOCHE</div><div class="sc-value">${fmtP(kpis.totalNoche)}<small class="sc-sub"> ${kpis.pctNoche}%</small></div></div>
+    <div class="summary-card"><div class="sc-label">Hora pico</div><div class="sc-value">${kpis.bestHora ? kpis.bestHora.label : '—'}<small class="sc-sub"> ${kpis.bestHora ? fmtP(kpis.bestHora.ventaTotal) : ''}</small></div></div>
+    <div class="summary-card"><div class="sc-label">Mejor día</div><div class="sc-value">${kpis.bestDia ? (DIA_LABEL_MAP[kpis.bestDia.diaSemana] || kpis.bestDia.diaSemana) : '—'}<small class="sc-sub"> ${kpis.bestDia ? fmtP(kpis.bestDia.ventaTotal) : ''}</small></div></div>
+    <div class="summary-card"><div class="sc-label">Total órdenes</div><div class="sc-value">${fmtN(kpis.totalOrdenes)}</div></div>
+  `;
+}
+
+function renderHorlyChart(hourlyStats) {
+  if (!hourlyStats || !hourlyStats.length) return;
+  const ctx = document.getElementById('chart-tur-hora');
+  if (!ctx) return;
+
+  // Find top 3 hours by ventaAvg for peak highlighting
+  const sorted    = [...hourlyStats].sort((a, b) => b.ventaAvg - a.ventaAvg);
+  const peakHours = new Set(sorted.slice(0, 3).map(h => h.hora));
+
+  const labels = hourlyStats.map(h => h.label);
+  const values = hourlyStats.map(h => h.ventaAvg);
+  const colors = hourlyStats.map(h =>
+    peakHours.has(h.hora) ? TUR_PEAK_COLOR :
+    h.turno === 'DIA'     ? TUR_DIA_COLOR  : TUR_NOCHE_COLOR
+  );
+
+  if (charts['tur-hora']) charts['tur-hora'].destroy();
+  charts['tur-hora'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Venta promedio',
+        data: values,
+        backgroundColor: colors,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => '$' + Math.round(ctx.parsed.y).toLocaleString('es-AR'),
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: {
+          ticks: { callback: v => '$' + Math.round(v / 1000) + 'k' },
+          grid: { color: 'rgba(0,0,0,0.05)' }
+        }
+      }
+    }
+  });
+}
+
+function renderShiftEvolucion(data) {
+  if (!data || !data.length) return;
+  const ctx = document.getElementById('chart-tur-shift');
+  if (!ctx) return;
+
+  const labels    = data.map(d => {
+    const m = MES_LABEL_MAP[d.mesNombre] || d.mesNombre;
+    return `${m} ${d.año}`;
+  });
+  const diaData   = data.map(d => d.DIA   || 0);
+  const nocheData = data.map(d => d.NOCHE || 0);
+
+  if (charts['tur-shift']) charts['tur-shift'].destroy();
+  charts['tur-shift'] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'DIA',
+          data: diaData,
+          borderColor: TUR_DIA_COLOR,
+          backgroundColor: TUR_DIA_COLOR + '22',
+          tension: 0.3, fill: false, pointRadius: 3,
+        },
+        {
+          label: 'NOCHE',
+          data: nocheData,
+          borderColor: TUR_NOCHE_COLOR,
+          backgroundColor: TUR_NOCHE_COLOR + '22',
+          tension: 0.3, fill: false, pointRadius: 3,
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: {
+          callbacks: { label: ctx => ctx.dataset.label + ': $' + Math.round(ctx.parsed.y).toLocaleString('es-AR') }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } },
+        y: { ticks: { callback: v => '$' + Math.round(v / 1000) + 'k' }, grid: { color: 'rgba(0,0,0,0.05)' } }
+      }
+    }
+  });
+}
+
+function renderHeatmap(data) {
+  const wrap = document.getElementById('tur-heatmap');
+  if (!wrap) return;
+  if (!data || !data.length) { wrap.innerHTML = '<p style="color:var(--muted);padding:16px">Sin datos</p>'; return; }
+
+  // Get unique months and days present in data
+  const months = MES_ORDER_TUR.filter(m => data.some(d => d.mesNombre === m));
+  const days   = DIA_ORDER_TUR.filter(d => data.some(r => r.diaSemana === d));
+
+  // Min/max for color scale
+  const values = data.map(d => d.avgVenta);
+  const minV   = Math.min(...values);
+  const maxV   = Math.max(...values);
+
+  function heatColor(val) {
+    if (maxV <= minV) return 'rgba(200,168,75,0.25)';
+    const t = (val - minV) / (maxV - minV);
+    // Crema (#f4f1ec) → Gold (#c8a84b)
+    const r = Math.round(244 + (200 - 244) * t);
+    const g = Math.round(241 + (168 - 241) * t);
+    const b = Math.round(236 + (75  - 236) * t);
+    return `rgb(${r},${g},${b})`;
+  }
+  function textColor(val) {
+    const t = maxV > minV ? (val - minV) / (maxV - minV) : 0;
+    return t > 0.55 ? '#3d2a00' : '#7a7060';
+  }
+
+  // Build lookup
+  const lookup = {};
+  for (const d of data) lookup[`${d.mesNombre}|${d.diaSemana}`] = d;
+
+  // Render grid
+  const fmtK = n => '$' + Math.round(n / 1000).toLocaleString('es-AR') + 'k';
+
+  let html = `<div class="tur-heatmap" style="--hm-cols:${days.length}">`;
+
+  // Header row
+  html += '<div class="hm-cell hm-header hm-corner"></div>';
+  for (const d of days) {
+    html += `<div class="hm-cell hm-header">${DIA_LABEL_MAP[d] || d}</div>`;
+  }
+
+  // Data rows
+  for (const m of months) {
+    html += `<div class="hm-cell hm-row-label">${MES_LABEL_MAP[m] || m}</div>`;
+    for (const d of days) {
+      const cell = lookup[`${m}|${d}`];
+      if (cell) {
+        const bg    = heatColor(cell.avgVenta);
+        const color = textColor(cell.avgVenta);
+        html += `<div class="hm-cell hm-data" style="background:${bg};color:${color}" title="${MES_LABEL_MAP[m]} ${DIA_LABEL_MAP[d]}: ${fmtK(cell.avgVenta)} prom. (${cell.count} días)">
+          ${fmtK(cell.avgVenta)}
+        </div>`;
+      } else {
+        html += `<div class="hm-cell hm-data hm-empty">—</div>`;
+      }
+    }
+  }
+  html += '</div>';
+  wrap.innerHTML = html;
+}
 
 // Iniciar
 initAuth().then(() => {

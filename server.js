@@ -19,11 +19,21 @@ const {
   buildProductEvolucion,
   buildInflacion,
 } = require('./src/cartaTransform');
+const { fetchVentasHorarios } = require('./src/ventasHorariosSheets');
+const {
+  filterVentas,
+  buildHourlyStats,
+  buildShiftEvolucion,
+  buildHeatmap,
+  buildTurnosKPIs,
+  buildCatalog,
+} = require('./src/ventasHorariosTransform');
 const auth = require('./src/auth');
 
-const app      = express();
-const cache    = new NodeCache({ stdTTL: parseInt(process.env.CACHE_TTL) || 600 });
-const ipcCache = new NodeCache({ stdTTL: 12 * 3600 }); // IPC INDEC: cache 12 h
+const app        = express();
+const cache      = new NodeCache({ stdTTL: parseInt(process.env.CACHE_TTL) || 600 });
+const ipcCache   = new NodeCache({ stdTTL: 12 * 3600 }); // IPC INDEC: cache 12 h
+const turnosCache = new NodeCache({ stdTTL: parseInt(process.env.CACHE_TTL) || 600 });
 
 // ── Configuración de proxy (Railway usa HTTPS terminado en proxy) ────────────
 app.set('trust proxy', 1);
@@ -237,6 +247,40 @@ async function getData() {
   return data;
 }
 
+async function getTurnosData() {
+  const cached = turnosCache.get('turnos');
+  if (cached) return cached;
+  const data = await fetchVentasHorarios();
+  turnosCache.set('turnos', data);
+  return data;
+}
+
+// Turnos & Horarios
+app.get('/api/turnos', async (req, res) => {
+  try {
+    const allRecords = await getTurnosData();
+    const parse = key => req.query[key] ? req.query[key].split(',').map(s => s.trim()) : ['all'];
+    const anos  = parse('anos');
+    const meses = parse('meses');
+    const dias  = parse('dias');
+    const turno = req.query.turno || 'all';
+
+    const filtered = filterVentas(allRecords, { anos, meses, dias, turno });
+    const catalog  = buildCatalog(allRecords); // catalog siempre sin filtros
+
+    res.json({
+      kpis:           buildTurnosKPIs(filtered),
+      hourlyStats:    buildHourlyStats(filtered),
+      shiftEvolucion: buildShiftEvolucion(filtered),
+      heatmap:        buildHeatmap(filtered),
+      catalog,
+    });
+  } catch (err) {
+    console.error('Error /api/turnos:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Datos del tablero (con filtros opcionales)
 // Query params: ?anos=2024,2025  &meses=ENERO,FEBRERO  &categorias=C1,C2  &productos=P1  &metric=ventas|cantidad
 app.get('/api/carta', async (req, res) => {
@@ -324,7 +368,8 @@ app.get('/api/ipc', async (req, res) => {
 // Limpiar cache
 app.post('/api/refresh', (req, res) => {
   cache.flushAll();
-  ipcCache.flushAll();   // también limpia el IPC para forzar refetch
+  ipcCache.flushAll();     // también limpia el IPC para forzar refetch
+  turnosCache.flushAll();  // limpia datos de turnos & horarios
   res.json({ ok: true });
 });
 

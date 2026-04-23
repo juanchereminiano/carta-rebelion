@@ -1280,3 +1280,91 @@ body {
   /* Top tables en mobile: ocultar cant. */
   .top-table th:nth-child(5), .top-table td:nth-child(5) { display: none; }
 }
+
+/* ── Turnos & Horarios ───────────────────────────────────────────────────── */
+.tur-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--gap);
+  margin-bottom: var(--gap);
+}
+
+.sc-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: 4px;
+}
+.sc-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+.sc-sub {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 4px;
+}
+
+.tur-legend {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.72rem; color: var(--muted);
+}
+.tur-dot {
+  width: 10px; height: 10px; border-radius: 3px; display: inline-block;
+}
+.tur-dot-dia   { background: #4a9eff; }
+.tur-dot-noche { background: #2b5ead; }
+.tur-dot-peak  { background: #c8a84b; }
+
+/* Heatmap */
+.tur-heatmap-wrap { overflow-x: auto; }
+.tur-heatmap {
+  display: grid;
+  grid-template-columns: 60px repeat(var(--hm-cols), 1fr);
+  gap: 3px;
+  min-width: 500px;
+}
+.hm-cell {
+  padding: 8px 4px;
+  text-align: center;
+  font-size: 0.7rem;
+  border-radius: 5px;
+  line-height: 1.2;
+}
+.hm-header {
+  font-weight: 700;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--muted);
+  background: transparent;
+}
+.hm-corner { background: transparent; }
+.hm-row-label {
+  font-weight: 600;
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-align: right;
+  padding-right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.hm-data {
+  cursor: default;
+  transition: transform 0.1s, box-shadow 0.1s;
+  font-weight: 600;
+}
+.hm-data:hover {
+  transform: scale(1.08);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 1; position: relative;
+}
+.hm-empty {
+  background: var(--bg);
+  color: var(--border);
+}
