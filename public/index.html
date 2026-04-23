@@ -69,12 +69,33 @@
         <span class="btn-filter-label">Filtros</span>
         <span id="filter-count-badge" class="filter-count-badge" style="display:none"></span>
       </button>
-      <div class="refresh-wrap">
+      <div class="refresh-wrap" id="refresh-wrap" style="display:none">
         <button id="btn-refresh" class="btn-refresh" title="Forzar actualización desde Google Sheets">
           <span class="refresh-icon">&#8635;</span>
           <span class="refresh-label">Actualizar</span>
         </button>
         <span id="refresh-status" class="refresh-status"></span>
+      </div>
+
+      <!-- Menú de usuario -->
+      <div class="user-menu" id="user-menu">
+        <button class="user-menu-btn" id="user-menu-btn">
+          <span class="user-avatar" id="user-avatar">?</span>
+          <span class="user-name" id="user-display-name">…</span>
+          <span class="user-role-badge" id="user-role-badge"></span>
+          <span class="user-caret">▾</span>
+        </button>
+        <div class="user-dropdown" id="user-dropdown">
+          <div class="ud-header">
+            <div class="ud-fullname" id="ud-fullname"></div>
+            <div class="ud-email" id="ud-email"></div>
+          </div>
+          <div class="ud-divider"></div>
+          <button class="ud-item" id="btn-change-password">🔑 Cambiar contraseña</button>
+          <button class="ud-item ud-admin" id="btn-admin-users" style="display:none">👥 Gestión de usuarios</button>
+          <div class="ud-divider"></div>
+          <button class="ud-item ud-logout" id="btn-logout">↩ Cerrar sesión</button>
+        </div>
       </div>
     </div>
   </header>
@@ -425,6 +446,76 @@
 </div>
 
 <div id="toast" class="toast"></div>
+
+<!-- ── Modal: Cambiar contraseña ────────────────────────────────────────── -->
+<div id="modal-chpass" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Cambiar contraseña</h3>
+      <button class="modal-close" data-close="modal-chpass">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label>Contraseña actual</label>
+        <input type="password" id="chpass-current" placeholder="••••••••" autocomplete="current-password" />
+      </div>
+      <div class="modal-field">
+        <label>Nueva contraseña</label>
+        <input type="password" id="chpass-new" placeholder="Mín. 6 caracteres" autocomplete="new-password" />
+      </div>
+      <div class="modal-field">
+        <label>Confirmar nueva contraseña</label>
+        <input type="password" id="chpass-confirm" placeholder="Repetir contraseña" autocomplete="new-password" />
+      </div>
+      <div id="chpass-error" class="modal-error" style="display:none"></div>
+      <div id="chpass-ok" class="modal-success" style="display:none">✓ Contraseña actualizada</div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn-secondary" data-close="modal-chpass">Cancelar</button>
+      <button class="modal-btn-primary" id="chpass-submit">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Gestión de usuarios (admin) ───────────────────────────────── -->
+<div id="modal-admin" class="modal-overlay" style="display:none">
+  <div class="modal-box modal-box-wide">
+    <div class="modal-header">
+      <h3>Gestión de usuarios</h3>
+      <button class="modal-close" data-close="modal-admin">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-note">Los cambios de contraseña persisten hasta el próximo deploy. Para hacerlos permanentes, actualizá la variable <code>USERS</code> en Railway con el nuevo hash.</p>
+      <div id="admin-users-list" class="admin-users-list"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn-secondary" data-close="modal-admin">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Resetear contraseña (admin) ───────────────────────────────── -->
+<div id="modal-reset" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Resetear contraseña</h3>
+      <button class="modal-close" data-close="modal-reset">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="reset-user-label" style="font-size:0.85rem;color:var(--muted);margin-bottom:14px"></p>
+      <div class="modal-field">
+        <label>Nueva contraseña</label>
+        <input type="text" id="reset-new-pass" placeholder="Escribí la nueva contraseña" />
+      </div>
+      <div id="reset-error" class="modal-error" style="display:none"></div>
+      <div id="reset-ok" class="modal-success" style="display:none">✓ Contraseña reseteada. Comunicásela al usuario.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn-secondary" data-close="modal-reset">Cancelar</button>
+      <button class="modal-btn-primary" id="reset-submit">Resetear</button>
+    </div>
+  </div>
+</div>
 
 <script src="/js/app.js"></script>
 </body>

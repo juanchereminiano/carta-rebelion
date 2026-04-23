@@ -204,6 +204,199 @@ body {
 .refresh-status.ok   { color: #28a67e; }
 .refresh-status.live { color: var(--accent); font-weight: 600; }
 
+/* ── User menu ───────────────────────────────────────────────────────────── */
+.user-menu { position: relative; }
+
+.user-menu-btn {
+  display: flex; align-items: center; gap: 7px;
+  height: 34px; padding: 0 10px 0 6px;
+  background: rgba(43,94,173,0.08);
+  border: 1px solid rgba(43,94,173,0.18);
+  border-radius: 20px; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  font-size: 0.78rem; color: var(--text);
+  white-space: nowrap;
+}
+.user-menu-btn:hover {
+  background: rgba(43,94,173,0.14);
+  border-color: rgba(43,94,173,0.3);
+}
+
+.user-avatar {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  font-size: 0.65rem; font-weight: 700;
+  display: grid; place-items: center;
+  flex-shrink: 0; text-transform: uppercase;
+}
+.user-name { font-weight: 600; max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+.user-role-badge {
+  font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; padding: 2px 6px; border-radius: 10px;
+  background: var(--gold); color: #fff;
+}
+.user-role-badge.role-admin    { background: var(--accent); }
+.user-role-badge.role-gerencia { background: #3b8a6e; }
+.user-role-badge.role-staff    { background: var(--muted); }
+.user-caret { font-size: 0.65rem; color: var(--muted); }
+
+.user-dropdown {
+  position: absolute; right: 0; top: calc(100% + 8px);
+  width: 230px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.13);
+  z-index: 500;
+  display: none;
+  overflow: hidden;
+}
+.user-dropdown.open { display: block; }
+
+.ud-header {
+  padding: 14px 16px 12px;
+  background: rgba(43,94,173,0.04);
+}
+.ud-fullname { font-weight: 700; font-size: 0.88rem; color: var(--text); }
+.ud-email    { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+
+.ud-divider { height: 1px; background: var(--border); }
+
+.ud-item {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 11px 16px;
+  background: none; border: none; cursor: pointer;
+  font-size: 0.82rem; color: var(--text);
+  text-align: left; transition: background 0.12s;
+}
+.ud-item:hover { background: rgba(0,0,0,0.04); }
+.ud-logout    { color: #c0334f; }
+.ud-logout:hover { background: rgba(192,51,79,0.07); }
+
+/* ── Modales ─────────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  backdrop-filter: blur(2px);
+}
+
+.modal-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  width: 100%; max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  display: flex; flex-direction: column;
+  max-height: 90vh;
+}
+.modal-box-wide { max-width: 580px; }
+
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.modal-header h3 {
+  font-size: 1rem; font-weight: 700; color: var(--text); margin: 0;
+  text-transform: none; letter-spacing: 0;
+}
+.modal-close {
+  background: none; border: none; cursor: pointer;
+  font-size: 1rem; color: var(--muted); padding: 4px 8px;
+  border-radius: 6px; transition: background 0.12s, color 0.12s;
+}
+.modal-close:hover { background: rgba(0,0,0,0.06); color: var(--text); }
+
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-field { margin-bottom: 14px; }
+.modal-field label {
+  display: block; font-size: 0.7rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.07em;
+  color: var(--muted); margin-bottom: 5px;
+}
+.modal-field input {
+  width: 100%; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: 8px;
+  font-size: 0.9rem; color: var(--text); background: var(--bg);
+  outline: none; transition: border-color 0.2s;
+}
+.modal-field input:focus { border-color: var(--accent); }
+
+.modal-error {
+  padding: 9px 12px; background: rgba(192,51,79,0.08);
+  border: 1px solid rgba(192,51,79,0.2);
+  border-radius: 8px; color: #c0334f; font-size: 0.8rem;
+  margin-top: 4px;
+}
+.modal-success {
+  padding: 9px 12px; background: rgba(40,166,126,0.09);
+  border: 1px solid rgba(40,166,126,0.2);
+  border-radius: 8px; color: #28a67e; font-size: 0.8rem;
+  margin-top: 4px;
+}
+.modal-note {
+  font-size: 0.78rem; color: var(--muted); margin-bottom: 16px;
+  line-height: 1.5;
+}
+.modal-note code {
+  background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.modal-footer {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.modal-btn-secondary {
+  padding: 9px 16px; border-radius: 8px; border: 1px solid var(--border);
+  background: none; font-size: 0.83rem; font-weight: 600;
+  cursor: pointer; color: var(--muted);
+  transition: background 0.12s;
+}
+.modal-btn-secondary:hover { background: var(--bg); }
+.modal-btn-primary {
+  padding: 9px 18px; border-radius: 8px; border: none;
+  background: var(--accent); color: #fff;
+  font-size: 0.83rem; font-weight: 700; cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+.modal-btn-primary:hover:not(:disabled) { background: var(--accent-hi); }
+.modal-btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Admin: tabla de usuarios */
+.admin-users-list { display: flex; flex-direction: column; gap: 8px; }
+.admin-user-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg);
+}
+.admin-user-info { flex: 1; min-width: 0; }
+.admin-user-name  { font-weight: 600; font-size: 0.85rem; }
+.admin-user-email { font-size: 0.72rem; color: var(--muted); }
+.admin-reset-btn {
+  padding: 6px 11px; border-radius: 7px;
+  border: 1px solid var(--border); background: none;
+  font-size: 0.72rem; font-weight: 600; cursor: pointer;
+  color: var(--muted); white-space: nowrap;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  flex-shrink: 0;
+}
+.admin-reset-btn:hover {
+  background: rgba(43,94,173,0.08); color: var(--accent);
+  border-color: var(--accent);
+}
+
 /* ── Main content ────────────────────────────────────────────────────────── */
 .app-main {
   flex: 1;

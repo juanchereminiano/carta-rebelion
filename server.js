@@ -3,6 +3,8 @@ require('dotenv').config();
 const express   = require('express');
 const cors      = require('cors');
 const https     = require('https');
+const path      = require('path');
+const session   = require('express-session');
 const NodeCache = require('node-cache');
 
 const { fetchCartaData }  = require('./src/cartaSheets');
@@ -17,10 +19,14 @@ const {
   buildProductEvolucion,
   buildInflacion,
 } = require('./src/cartaTransform');
+const auth = require('./src/auth');
 
 const app      = express();
 const cache    = new NodeCache({ stdTTL: parseInt(process.env.CACHE_TTL) || 600 });
 const ipcCache = new NodeCache({ stdTTL: 12 * 3600 }); // IPC INDEC: cache 12 h
+
+// ── Configuración de proxy (Railway usa HTTPS terminado en proxy) ────────────
+app.set('trust proxy', 1);
 
 // ── Helper HTTP GET → JSON (sin dependencias extra) ─────────────────────────
 function httpsGetJSON(url, redirects = 3) {
@@ -96,6 +102,105 @@ async function fetchIPC() {
 }
 
 app.use(cors());
+app.use(express.json());
+
+// ── Sesiones ─────────────────────────────────────────────────────────────────
+app.use(session({
+  secret:            process.env.SESSION_SECRET || 'carta-rebelion-dev-secret-change-me',
+  resave:            false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge:   8 * 3600 * 1000,                          // 8 horas
+    secure:   process.env.NODE_ENV === 'production',    // HTTPS en Railway
+  },
+}));
+
+// ── Middleware de autenticación ───────────────────────────────────────────────
+function requireAuth(req, res, next) {
+  if (req.session && req.session.userId) return next();
+  if (req.path.startsWith('/api/') || req.path.startsWith('/admin/')) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
+  return res.redirect('/login');
+}
+
+// ── Rutas públicas (sin autenticación) ───────────────────────────────────────
+app.get('/login', (req, res) => {
+  if (req.session && req.session.userId) return res.redirect('/');
+  res.sendFile(path.join(__dirname, 'views', 'login.html'));
+});
+
+app.post('/auth/login', async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password)
+    return res.status(400).json({ error: 'Email y contraseña requeridos' });
+
+  const user = auth.findByEmail(email);
+  if (!user) return res.status(401).json({ error: 'Credenciales incorrectas' });
+
+  const ok = await auth.verifyPassword(user, password);
+  if (!ok) return res.status(401).json({ error: 'Credenciales incorrectas' });
+
+  req.session.userId = user.id;
+  res.json({ ok: true, user: auth.publicUser(user) });
+});
+
+app.post('/auth/logout', (req, res) => {
+  req.session.destroy(() => res.json({ ok: true }));
+});
+
+// ── Todo lo que sigue requiere autenticación ──────────────────────────────────
+app.use(requireAuth);
+
+// ── Rutas autenticadas ─────────────────────────────────────────────────────
+app.get('/auth/me', (req, res) => {
+  const user = auth.findById(req.session.userId);
+  if (!user) { req.session.destroy(() => {}); return res.status(401).json({ error: 'Sesión inválida' }); }
+  res.json(auth.publicUser(user));
+});
+
+app.post('/auth/change-password', async (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword)
+    return res.status(400).json({ error: 'Faltan campos' });
+  if (newPassword.length < 6)
+    return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+
+  const user = auth.findById(req.session.userId);
+  const ok   = await auth.verifyPassword(user, currentPassword);
+  if (!ok) return res.status(401).json({ error: 'Contraseña actual incorrecta' });
+
+  await auth.changePassword(user.id, newPassword);
+  res.json({ ok: true });
+});
+
+// ── Rutas de admin ────────────────────────────────────────────────────────────
+function requireAdmin(req, res, next) {
+  const user = auth.findById(req.session.userId);
+  if (!user || user.role !== 'admin')
+    return res.status(403).json({ error: 'Permiso insuficiente' });
+  next();
+}
+
+app.get('/admin/users', requireAdmin, (req, res) => {
+  res.json(auth.listUsers());
+});
+
+app.post('/admin/reset-password', requireAdmin, async (req, res) => {
+  const { userId, newPassword } = req.body || {};
+  if (!userId || !newPassword)
+    return res.status(400).json({ error: 'Faltan campos' });
+  if (newPassword.length < 6)
+    return res.status(400).json({ error: 'Mínimo 6 caracteres' });
+
+  const ok = await auth.changePassword(userId, newPassword);
+  if (!ok) return res.status(404).json({ error: 'Usuario no encontrado' });
+  res.json({ ok: true });
+});
+
+// ── Archivos estáticos (solo para usuarios autenticados) ──────────────────────
 app.use(express.static('public'));
 
 async function getData() {

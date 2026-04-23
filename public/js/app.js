@@ -1,5 +1,251 @@
 /* ── CARTA REBELION — App ──────────────────────────────────────────────── */
 
+// ── Auth — usuario actual ──────────────────────────────────────────────────
+let currentUser = null;   // { id, name, email, role, sections, canRefresh }
+
+async function initAuth() {
+  try {
+    const res = await fetch('/auth/me');
+    if (!res.ok) { window.location.href = '/login'; return; }
+    currentUser = await res.json();
+    applyRoleUI(currentUser);
+  } catch {
+    window.location.href = '/login';
+  }
+}
+
+// Aplica visibilidad de secciones, refresh y menú de usuario según el rol
+function applyRoleUI(user) {
+  // Refresh button — solo admin
+  const refreshWrap = document.getElementById('refresh-wrap');
+  if (refreshWrap) refreshWrap.style.display = user.canRefresh ? '' : 'none';
+
+  // Nav items — ocultar lo que el rol no puede ver
+  document.querySelectorAll('.nav-item[data-section]').forEach(item => {
+    const section = item.dataset.section;
+    if (!user.sections.includes(section)) {
+      item.style.display = 'none';
+    }
+  });
+
+  // Menú de usuario
+  const initials = user.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  const avatar   = document.getElementById('user-avatar');
+  const dispName = document.getElementById('user-display-name');
+  const roleBadge= document.getElementById('user-role-badge');
+  const udName   = document.getElementById('ud-fullname');
+  const udEmail  = document.getElementById('ud-email');
+
+  if (avatar)    { avatar.textContent = initials; }
+  if (dispName)  dispName.textContent = user.name.split(' ')[0]; // solo primer nombre
+  if (roleBadge) {
+    roleBadge.textContent = user.roleLabel;
+    roleBadge.className   = `user-role-badge role-${user.role}`;
+  }
+  if (udName)  udName.textContent  = user.name;
+  if (udEmail) udEmail.textContent = user.email;
+
+  // Panel admin — solo para admins
+  const btnAdmin = document.getElementById('btn-admin-users');
+  if (btnAdmin) btnAdmin.style.display = user.role === 'admin' ? '' : 'none';
+
+  // Navegar a la primera sección disponible
+  if (user.sections.length > 0) navigateTo(user.sections[0]);
+}
+
+// ── User menu toggle ───────────────────────────────────────────────────────
+function initUserMenu() {
+  const btn      = document.getElementById('user-menu-btn');
+  const dropdown = document.getElementById('user-dropdown');
+  if (!btn || !dropdown) return;
+
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    dropdown.classList.toggle('open');
+  });
+  document.addEventListener('click', () => dropdown.classList.remove('open'));
+
+  // Logout
+  document.getElementById('btn-logout').addEventListener('click', async () => {
+    await fetch('/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
+  });
+
+  // Abrir modal cambio de contraseña
+  document.getElementById('btn-change-password').addEventListener('click', () => {
+    dropdown.classList.remove('open');
+    openModal('modal-chpass');
+    document.getElementById('chpass-current').value = '';
+    document.getElementById('chpass-new').value     = '';
+    document.getElementById('chpass-confirm').value = '';
+    document.getElementById('chpass-error').style.display = 'none';
+    document.getElementById('chpass-ok').style.display    = 'none';
+  });
+
+  // Abrir modal admin usuarios
+  const btnAdmin = document.getElementById('btn-admin-users');
+  if (btnAdmin) btnAdmin.addEventListener('click', () => {
+    dropdown.classList.remove('open');
+    openModal('modal-admin');
+    loadAdminUsers();
+  });
+}
+
+// ── Modales ────────────────────────────────────────────────────────────────
+function openModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'flex';
+}
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'none';
+}
+
+function initModals() {
+  // Botones de cierre [data-close]
+  document.querySelectorAll('[data-close]').forEach(btn => {
+    btn.addEventListener('click', () => closeModal(btn.dataset.close));
+  });
+  // Click fuera del modal-box cierra
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) closeModal(overlay.id);
+    });
+  });
+
+  // ── Cambiar contraseña ──────────────────────────────────────────────────
+  document.getElementById('chpass-submit').addEventListener('click', async () => {
+    const btn     = document.getElementById('chpass-submit');
+    const errEl   = document.getElementById('chpass-error');
+    const okEl    = document.getElementById('chpass-ok');
+    const current = document.getElementById('chpass-current').value;
+    const newPass = document.getElementById('chpass-new').value;
+    const confirm = document.getElementById('chpass-confirm').value;
+
+    errEl.style.display = 'none';
+    okEl.style.display  = 'none';
+
+    if (!current || !newPass || !confirm) {
+      errEl.textContent    = 'Completá todos los campos.';
+      errEl.style.display  = 'block'; return;
+    }
+    if (newPass !== confirm) {
+      errEl.textContent    = 'Las contraseñas no coinciden.';
+      errEl.style.display  = 'block'; return;
+    }
+    if (newPass.length < 6) {
+      errEl.textContent    = 'La contraseña debe tener al menos 6 caracteres.';
+      errEl.style.display  = 'block'; return;
+    }
+
+    btn.disabled    = true;
+    btn.textContent = 'Guardando…';
+    try {
+      const res  = await fetch('/auth/change-password', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ currentPassword: current, newPassword: newPass }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        okEl.style.display = 'block';
+        document.getElementById('chpass-current').value = '';
+        document.getElementById('chpass-new').value     = '';
+        document.getElementById('chpass-confirm').value = '';
+        setTimeout(() => closeModal('modal-chpass'), 1800);
+      } else {
+        errEl.textContent   = data.error || 'Error al cambiar la contraseña.';
+        errEl.style.display = 'block';
+      }
+    } catch {
+      errEl.textContent   = 'Error de conexión.';
+      errEl.style.display = 'block';
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = 'Guardar';
+    }
+  });
+
+  // ── Admin: resetear contraseña ──────────────────────────────────────────
+  let _resetTargetId = null;
+  document.getElementById('reset-submit').addEventListener('click', async () => {
+    const btn     = document.getElementById('reset-submit');
+    const errEl   = document.getElementById('reset-error');
+    const okEl    = document.getElementById('reset-ok');
+    const newPass = document.getElementById('reset-new-pass').value;
+
+    errEl.style.display = 'none';
+    okEl.style.display  = 'none';
+
+    if (!newPass || newPass.length < 6) {
+      errEl.textContent   = 'Mínimo 6 caracteres.';
+      errEl.style.display = 'block'; return;
+    }
+
+    btn.disabled    = true;
+    btn.textContent = 'Reseteando…';
+    try {
+      const res  = await fetch('/admin/reset-password', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ userId: _resetTargetId, newPassword: newPass }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        okEl.style.display = 'block';
+        document.getElementById('reset-new-pass').value = '';
+        setTimeout(() => closeModal('modal-reset'), 2200);
+      } else {
+        errEl.textContent   = data.error || 'Error al resetear.';
+        errEl.style.display = 'block';
+      }
+    } catch {
+      errEl.textContent   = 'Error de conexión.';
+      errEl.style.display = 'block';
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = 'Resetear';
+    }
+  });
+
+  // Exponer para loadAdminUsers
+  window._setResetTarget = (id, name) => {
+    _resetTargetId = id;
+    document.getElementById('reset-user-label').textContent = `Usuario: ${name}`;
+    document.getElementById('reset-new-pass').value = '';
+    document.getElementById('reset-error').style.display = 'none';
+    document.getElementById('reset-ok').style.display    = 'none';
+    openModal('modal-reset');
+  };
+}
+
+// ── Admin: cargar lista de usuarios ───────────────────────────────────────
+async function loadAdminUsers() {
+  const list = document.getElementById('admin-users-list');
+  if (!list) return;
+  list.innerHTML = '<p style="color:var(--muted);font-size:0.82rem">Cargando…</p>';
+
+  try {
+    const users = await fetch('/admin/users').then(r => r.json());
+    const ROLE_LABELS = { admin: 'Admin', gerencia: 'Gerencia', staff: 'Staff' };
+    list.innerHTML = users.map(u => `
+      <div class="admin-user-row">
+        <div class="admin-user-info">
+          <div class="admin-user-name">${u.name}
+            <span class="user-role-badge role-${u.role}" style="margin-left:6px;font-size:0.55rem">${ROLE_LABELS[u.role]||u.role}</span>
+          </div>
+          <div class="admin-user-email">${u.email}</div>
+        </div>
+        ${u.id !== currentUser?.id
+          ? `<button class="admin-reset-btn" onclick="window._setResetTarget('${u.id}','${u.name}')">Resetear contraseña</button>`
+          : `<span style="font-size:0.7rem;color:var(--muted)">(vos mismo)</span>`
+        }
+      </div>`).join('');
+  } catch {
+    list.innerHTML = '<p style="color:#e03c5a;font-size:0.82rem">Error al cargar usuarios.</p>';
+  }
+}
+
 // ── Estado global ──────────────────────────────────────────────────────────
 const state = {
   // Filtros multi-select (arrays; 'all' = sin restricción)
@@ -2137,13 +2383,17 @@ document.querySelectorAll('.nav-item').forEach(item => {
 });
 
 // Iniciar
-initFilterToggle();
-initFilters();
-initSegFilters();
-renderSegChips();
-initSegSearch();
-initInfProdFilters();
-renderInfProdChips();
-initInfProdSearch();
-_startAutoRefresh();   // auto-refresh cada 60s
-loadData();
+initAuth().then(() => {
+  initFilterToggle();
+  initFilters();
+  initSegFilters();
+  renderSegChips();
+  initSegSearch();
+  initInfProdFilters();
+  renderInfProdChips();
+  initInfProdSearch();
+  _startAutoRefresh();
+  loadData();
+});
+initUserMenu();
+initModals();

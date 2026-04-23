@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Carta Rebelión — Ingresar</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: #0d0b08;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      padding: 24px 16px;
+      background-image:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(200,168,75,0.08) 0%, transparent 70%);
+    }
+
+    .login-wrap {
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    /* ── Logo ── */
+    .login-logo {
+      text-align: center;
+    }
+    .login-mark {
+      display: inline-block;
+      font-size: 3rem;
+      color: #c8a84b;
+      line-height: 1;
+      margin-bottom: 10px;
+      filter: drop-shadow(0 0 18px rgba(200,168,75,0.4));
+    }
+    .login-brand {
+      font-size: 1.45rem;
+      font-weight: 800;
+      color: #f5f0e8;
+      letter-spacing: 0.01em;
+    }
+    .login-brand-sub {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: rgba(200,168,75,0.7);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    /* ── Card ── */
+    .login-card {
+      background: #16130e;
+      border: 1px solid rgba(245,240,232,0.1);
+      border-radius: 16px;
+      padding: 36px 32px 32px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+    }
+
+    .login-card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: rgba(245,240,232,0.75);
+      text-align: center;
+      margin-bottom: 28px;
+      letter-spacing: 0.01em;
+    }
+
+    /* ── Fields ── */
+    .field { margin-bottom: 18px; }
+    .field:last-of-type { margin-bottom: 24px; }
+
+    .field label {
+      display: block;
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: rgba(245,240,232,0.4);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 7px;
+    }
+
+    .field-wrap { position: relative; }
+
+    .field input {
+      width: 100%;
+      background: rgba(245,240,232,0.05);
+      border: 1px solid rgba(245,240,232,0.1);
+      border-radius: 10px;
+      padding: 13px 16px;
+      color: #f5f0e8;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s;
+      -webkit-appearance: none;
+    }
+    .field input:focus {
+      border-color: #c8a84b;
+      background: rgba(200,168,75,0.06);
+    }
+    .field input::placeholder { color: rgba(245,240,232,0.2); }
+    .field input:-webkit-autofill {
+      -webkit-box-shadow: 0 0 0 100px #16130e inset;
+      -webkit-text-fill-color: #f5f0e8;
+    }
+    .field input[type="password"] { padding-right: 44px; }
+
+    .eye-btn {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: rgba(245,240,232,0.3);
+      font-size: 1.1rem;
+      line-height: 1;
+      padding: 4px;
+      transition: color 0.15s;
+    }
+    .eye-btn:hover { color: rgba(245,240,232,0.65); }
+
+    /* ── Submit ── */
+    .login-btn {
+      width: 100%;
+      padding: 14px;
+      background: #c8a84b;
+      color: #0d0b08;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 800;
+      cursor: pointer;
+      letter-spacing: 0.03em;
+      transition: background 0.2s, transform 0.1s, opacity 0.2s;
+    }
+    .login-btn:hover:not(:disabled) { background: #d6b85a; transform: translateY(-1px); }
+    .login-btn:active:not(:disabled) { transform: translateY(0); }
+    .login-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .login-btn.loading::after {
+      content: '';
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(13,11,8,0.4);
+      border-top-color: #0d0b08;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Error ── */
+    .login-error {
+      margin-top: 14px;
+      background: rgba(224,60,90,0.1);
+      border: 1px solid rgba(224,60,90,0.25);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #e8607a;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      display: none;
+    }
+    .login-error.show { display: block; }
+
+    /* ── Footer ── */
+    .login-footer {
+      text-align: center;
+      font-size: 0.68rem;
+      color: rgba(245,240,232,0.2);
+    }
+
+    @media (max-width: 440px) {
+      .login-card { padding: 28px 20px 24px; border-radius: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="login-wrap">
+
+  <div class="login-logo">
+    <div class="login-mark">✺</div>
+    <div class="login-brand">Carta Rebelión</div>
+    <div class="login-brand-sub">Analytics</div>
+  </div>
+
+  <div class="login-card">
+    <div class="login-card-title">Ingresá a tu cuenta</div>
+
+    <form id="login-form" novalidate>
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" type="email" placeholder="usuario@rebelion.com"
+          required autocomplete="email" inputmode="email" />
+      </div>
+
+      <div class="field">
+        <label for="password">Contraseña</label>
+        <div class="field-wrap">
+          <input id="password" type="password" placeholder="••••••••"
+            required autocomplete="current-password" />
+          <button type="button" class="eye-btn" id="eye-btn" title="Mostrar contraseña">
+            <span id="eye-icon">◉</span>
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" class="login-btn" id="login-btn">Ingresar</button>
+      <div class="login-error" id="login-error"></div>
+    </form>
+  </div>
+
+  <div class="login-footer">Carta Rebelión Analytics · Acceso restringido</div>
+
+</div>
+
+<script>
+  // Toggle contraseña visible/oculta
+  const eyeBtn  = document.getElementById('eye-btn');
+  const eyeIcon = document.getElementById('eye-icon');
+  const passInput = document.getElementById('password');
+  let showPass = false;
+  eyeBtn.addEventListener('click', () => {
+    showPass = !showPass;
+    passInput.type  = showPass ? 'text' : 'password';
+    eyeIcon.textContent = showPass ? '◎' : '◉';
+  });
+
+  // Submit
+  document.getElementById('login-form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const btn = document.getElementById('login-btn');
+    const err = document.getElementById('login-error');
+    err.classList.remove('show');
+    btn.disabled = true;
+    btn.textContent = 'Ingresando';
+    btn.classList.add('loading');
+
+    try {
+      const res  = await fetch('/auth/login', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          email:    document.getElementById('email').value.trim(),
+          password: passInput.value,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        window.location.href = '/';
+      } else {
+        err.textContent = data.error || 'Error al ingresar. Revisá tus datos.';
+        err.classList.add('show');
+        btn.disabled = false;
+        btn.textContent = 'Ingresar';
+        btn.classList.remove('loading');
+        passInput.value = '';
+        passInput.focus();
+      }
+    } catch {
+      err.textContent = 'No se pudo conectar al servidor.';
+      err.classList.add('show');
+      btn.disabled = false;
+      btn.textContent = 'Ingresar';
+      btn.classList.remove('loading');
+    }
+  });
+</script>
+</body>
+</html>
