@@ -485,8 +485,30 @@
       <button class="modal-close" data-close="modal-admin">✕</button>
     </div>
     <div class="modal-body">
-      <p class="modal-note">Los cambios de contraseña persisten hasta el próximo deploy. Para hacerlos permanentes, actualizá la variable <code>USERS</code> en Railway con el nuevo hash.</p>
+
+      <!-- Lista de usuarios existentes -->
       <div id="admin-users-list" class="admin-users-list"></div>
+
+      <!-- Formulario: nuevo usuario -->
+      <div class="admin-new-user-section">
+        <div class="admin-new-user-title">Nuevo usuario</div>
+        <div class="admin-new-user-form">
+          <input type="text"     id="new-user-name"     class="modal-input" placeholder="Nombre completo" />
+          <input type="email"    id="new-user-email"    class="modal-input" placeholder="Email" autocomplete="off" />
+          <select id="new-user-role" class="modal-input modal-select">
+            <option value="">Rol…</option>
+            <option value="admin">Admin</option>
+            <option value="socio">Socio</option>
+            <option value="gerencia">Gerencia</option>
+            <option value="staff">Staff</option>
+          </select>
+          <input type="text"     id="new-user-password" class="modal-input" placeholder="Contraseña (mín. 6 car.)" autocomplete="off" />
+          <button class="modal-btn-primary admin-create-btn" id="btn-create-user">Crear</button>
+        </div>
+        <div id="new-user-error" class="modal-error"   style="display:none"></div>
+        <div id="new-user-ok"    class="modal-success" style="display:none"></div>
+      </div>
+
     </div>
     <div class="modal-footer">
       <button class="modal-btn-secondary" data-close="modal-admin">Cerrar</button>

@@ -200,6 +200,32 @@ app.post('/admin/reset-password', requireAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/admin/users', requireAdmin, async (req, res) => {
+  const { name, email, role, password } = req.body || {};
+  const result = await auth.createUser(name, email, role, password);
+  if (result.error) return res.status(409).json({ error: result.error });
+  res.json(result);
+});
+
+app.delete('/admin/users/:id', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  // No permitir que el admin se borre a sí mismo
+  if (String(id) === String(req.session.userId))
+    return res.status(400).json({ error: 'No podés eliminar tu propia cuenta' });
+  const ok = auth.deleteUser(id);
+  if (!ok) return res.status(404).json({ error: 'Usuario no encontrado' });
+  res.json({ ok: true });
+});
+
+app.patch('/admin/users/:id/role', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const { role } = req.body || {};
+  if (!role) return res.status(400).json({ error: 'Falta el rol' });
+  const ok = auth.updateUserRole(id, role);
+  if (!ok) return res.status(400).json({ error: 'Rol inválido o usuario no encontrado' });
+  res.json({ ok: true });
+});
+
 // ── Archivos estáticos (solo para usuarios autenticados) ──────────────────────
 app.use(express.static('public'));
 

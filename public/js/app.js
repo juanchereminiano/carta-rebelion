@@ -227,23 +227,130 @@ async function loadAdminUsers() {
 
   try {
     const users = await fetch('/admin/users').then(r => r.json());
-    const ROLE_LABELS = { admin: 'Admin', gerencia: 'Gerencia', staff: 'Staff' };
+    const ROLE_OPTS = ['admin','socio','gerencia','staff'];
+    const ROLE_LABELS = { admin:'Admin', socio:'Socio', gerencia:'Gerencia', staff:'Staff' };
+    const isSelf = id => String(id) === String(currentUser?.id);
+
     list.innerHTML = users.map(u => `
-      <div class="admin-user-row">
+      <div class="admin-user-row" data-uid="${u.id}">
         <div class="admin-user-info">
-          <div class="admin-user-name">${u.name}
-            <span class="user-role-badge role-${u.role}" style="margin-left:6px;font-size:0.55rem">${ROLE_LABELS[u.role]||u.role}</span>
-          </div>
-          <div class="admin-user-email">${u.email}</div>
+          <div class="admin-user-name">${escHtml(u.name)}</div>
+          <div class="admin-user-email">${escHtml(u.email)}</div>
         </div>
-        ${u.id !== currentUser?.id
-          ? `<button class="admin-reset-btn" onclick="window._setResetTarget('${u.id}','${u.name}')">Resetear contraseña</button>`
-          : `<span style="font-size:0.7rem;color:var(--muted)">(vos mismo)</span>`
-        }
+        <div class="admin-user-actions">
+          <select class="admin-role-select" data-uid="${u.id}" ${isSelf(u.id) ? 'disabled' : ''}>
+            ${ROLE_OPTS.map(r => `<option value="${r}" ${r===u.role?'selected':''}>${ROLE_LABELS[r]}</option>`).join('')}
+          </select>
+          ${!isSelf(u.id) ? `
+            <button class="admin-reset-btn" onclick="window._setResetTarget('${u.id}','${escHtml(u.name)}')">Contraseña</button>
+            <button class="admin-delete-btn" onclick="window._deleteUser('${u.id}','${escHtml(u.name)}')">✕</button>
+          ` : `<span class="admin-self-label">vos</span>`}
+        </div>
       </div>`).join('');
+
+    // Listener para cambio de rol inline
+    list.querySelectorAll('.admin-role-select').forEach(sel => {
+      sel.addEventListener('change', async () => {
+        const uid  = sel.dataset.uid;
+        const role = sel.value;
+        sel.disabled = true;
+        try {
+          const res = await fetch(`/admin/users/${uid}/role`, {
+            method:  'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ role }),
+          });
+          if (!res.ok) {
+            const d = await res.json();
+            showToast(d.error || 'Error al cambiar rol');
+            loadAdminUsers(); // revert visual
+          } else {
+            showToast('Rol actualizado');
+          }
+        } catch {
+          showToast('Error de conexión');
+          loadAdminUsers();
+        }
+        sel.disabled = false;
+      });
+    });
+
   } catch {
     list.innerHTML = '<p style="color:#e03c5a;font-size:0.82rem">Error al cargar usuarios.</p>';
   }
+}
+
+// ── Admin: eliminar usuario ─────────────────────────────────────────────────
+window._deleteUser = async (id, name) => {
+  if (!confirm(`¿Eliminar a ${name}? Esta acción no se puede deshacer.`)) return;
+  try {
+    const res = await fetch(`/admin/users/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (res.ok) {
+      showToast(`Usuario ${name} eliminado`);
+      loadAdminUsers();
+    } else {
+      showToast(data.error || 'Error al eliminar');
+    }
+  } catch {
+    showToast('Error de conexión');
+  }
+};
+
+// ── Admin: crear usuario ────────────────────────────────────────────────────
+function initCreateUser() {
+  const btn    = document.getElementById('btn-create-user');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    const errEl = document.getElementById('new-user-error');
+    const okEl  = document.getElementById('new-user-ok');
+    const name  = document.getElementById('new-user-name').value.trim();
+    const email = document.getElementById('new-user-email').value.trim();
+    const role  = document.getElementById('new-user-role').value;
+    const pass  = document.getElementById('new-user-password').value;
+
+    errEl.style.display = 'none';
+    okEl.style.display  = 'none';
+
+    if (!name || !email || !role || !pass) {
+      errEl.textContent   = 'Completá todos los campos.';
+      errEl.style.display = 'block'; return;
+    }
+
+    btn.disabled    = true;
+    btn.textContent = 'Creando…';
+    try {
+      const res  = await fetch('/admin/users', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ name, email, role, password: pass }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        okEl.textContent   = `✓ Usuario ${name} creado. Compartí las credenciales manualmente.`;
+        okEl.style.display = 'block';
+        document.getElementById('new-user-name').value     = '';
+        document.getElementById('new-user-email').value    = '';
+        document.getElementById('new-user-role').value     = '';
+        document.getElementById('new-user-password').value = '';
+        loadAdminUsers();
+      } else {
+        errEl.textContent   = data.error || 'Error al crear usuario.';
+        errEl.style.display = 'block';
+      }
+    } catch {
+      errEl.textContent   = 'Error de conexión.';
+      errEl.style.display = 'block';
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = 'Crear';
+    }
+  });
+}
+
+// ── Utilidad: escapar HTML ──────────────────────────────────────────────────
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ── Estado global ──────────────────────────────────────────────────────────
@@ -2397,3 +2504,4 @@ initAuth().then(() => {
 });
 initUserMenu();
 initModals();
+initCreateUser();

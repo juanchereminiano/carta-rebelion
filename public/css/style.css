@@ -396,6 +396,52 @@ body {
   background: rgba(43,94,173,0.08); color: var(--accent);
   border-color: var(--accent);
 }
+.admin-user-actions {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+}
+.admin-role-select {
+  padding: 4px 6px; border-radius: 7px; font-size: 0.72rem;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); cursor: pointer;
+}
+.admin-delete-btn {
+  padding: 5px 8px; border-radius: 7px;
+  border: 1px solid var(--border); background: none;
+  font-size: 0.72rem; font-weight: 700; cursor: pointer;
+  color: #c0392b; transition: background 0.12s, border-color 0.12s;
+}
+.admin-delete-btn:hover { background: rgba(192,57,43,0.1); border-color: #c0392b; }
+.admin-self-label {
+  font-size: 0.68rem; color: var(--muted); font-style: italic; padding: 0 4px;
+}
+
+/* Admin: nuevo usuario */
+.admin-new-user-section {
+  margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border);
+}
+.admin-new-user-title {
+  font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--muted); margin-bottom: 10px;
+}
+.admin-new-user-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr 120px 1fr auto;
+  gap: 8px; align-items: center;
+}
+.modal-input {
+  padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg);
+  color: var(--text); font-size: 0.82rem;
+  outline: none; transition: border-color 0.15s;
+}
+.modal-input:focus { border-color: var(--accent); }
+.modal-select { cursor: pointer; }
+.admin-create-btn { white-space: nowrap; padding: 8px 16px; }
+
+@media (max-width: 640px) {
+  .admin-new-user-form { grid-template-columns: 1fr 1fr; }
+  .admin-create-btn    { grid-column: 1 / -1; }
+}
 
 /* ── Main content ────────────────────────────────────────────────────────── */
 .app-main {
