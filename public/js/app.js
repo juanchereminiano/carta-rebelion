@@ -125,9 +125,15 @@ function triggerPrint(sectionIds, { includeDate, includeFilters }) {
   }
 
   // Marcar secciones seleccionadas
-  document.querySelectorAll('.page-section').forEach(s => s.classList.remove('print-include'));
-  sectionIds.forEach(id => {
-    document.getElementById(`section-${id}`)?.classList.add('print-include');
+  document.querySelectorAll('.page-section').forEach(s => {
+    s.classList.remove('print-include');
+    s.classList.remove('print-first');
+  });
+  sectionIds.forEach((id, idx) => {
+    const el = document.getElementById(`section-${id}`);
+    if (!el) return;
+    el.classList.add('print-include');
+    if (idx === 0) el.classList.add('print-first'); // sin page-break antes de la primera
   });
 
   // Imprimir
@@ -135,7 +141,10 @@ function triggerPrint(sectionIds, { includeDate, includeFilters }) {
     window.print();
     // Limpiar después de imprimir
     const cleanup = () => {
-      document.querySelectorAll('.page-section').forEach(s => s.classList.remove('print-include'));
+      document.querySelectorAll('.page-section').forEach(s => {
+        s.classList.remove('print-include');
+        s.classList.remove('print-first');
+      });
       window.removeEventListener('afterprint', cleanup);
     };
     window.addEventListener('afterprint', cleanup);

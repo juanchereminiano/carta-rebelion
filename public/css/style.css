@@ -1503,11 +1503,20 @@ body {
     visibility: hidden !important;
   }
 
-  /* 4 — App layout sin margen izquierdo */
+  /* 4 — App layout sin margen izquierdo + app-main sin flex height */
   .app-layout {
     display: block !important;
     margin-left: 0 !important;
+    padding: 0 !important;
     width: 100% !important;
+  }
+  .app-main {
+    display: block !important;
+    flex: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
   }
 
   /* 5 — Ocultar UI interactiva */
@@ -1599,12 +1608,14 @@ body {
   .page-section.print-include {
     display: block !important;
     width: 100%;
+    margin-bottom: 0 !important;
     page-break-before: always;
     break-before: always;
   }
-  .page-section.print-include:first-of-type {
-    page-break-before: avoid;
-    break-before: avoid;
+  /* Primera sección seleccionada — sin salto de página previo */
+  .page-section.print-first {
+    page-break-before: avoid !important;
+    break-before: avoid !important;
   }
 
   /* 8 — Título de sección */
