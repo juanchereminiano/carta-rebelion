@@ -53,6 +53,95 @@ function applyRoleUI(user) {
   if (user.sections.length > 0) navigateTo(user.sections[0]);
 }
 
+// ── Imprimir / PDF ─────────────────────────────────────────────────────────
+const PRINT_SECTIONS = [
+  { id: 'dashboard',  label: '▦ Dashboard Carta' },
+  { id: 'tabla',      label: '≡ Tabla de items' },
+  { id: 'bcg',        label: '⊞ Matriz BCG' },
+  { id: 'seguimiento',label: '⌕ Seguimiento' },
+  { id: 'inflacion',  label: '% Inflación Carta' },
+  { id: 'turnos',     label: '⏱ Turnos & Horarios' },
+];
+
+function initPrintModal() {
+  // Abrir modal
+  document.getElementById('btn-print')?.addEventListener('click', () => {
+    buildPrintSectionsList();
+    document.getElementById('print-warning').style.display = 'none';
+    openModal('modal-print');
+  });
+
+  // Generar PDF
+  document.getElementById('btn-do-print')?.addEventListener('click', () => {
+    const checked = [...document.querySelectorAll('#print-sections-grid input:checked')];
+    if (!checked.length) {
+      document.getElementById('print-warning').style.display = 'block';
+      return;
+    }
+    const selectedIds   = checked.map(c => c.value);
+    const includeDate   = document.getElementById('print-opt-date')?.checked;
+    const includeFilters= document.getElementById('print-opt-filters')?.checked;
+    closeModal('modal-print');
+    triggerPrint(selectedIds, { includeDate, includeFilters });
+  });
+}
+
+function buildPrintSectionsList() {
+  const grid = document.getElementById('print-sections-grid');
+  if (!grid) return;
+  const userSections = currentUser?.sections || [];
+  const available = PRINT_SECTIONS.filter(s => userSections.includes(s.id));
+  grid.innerHTML = available.map(s => `
+    <label class="print-section-row">
+      <input type="checkbox" value="${s.id}" checked />
+      <span>${s.label}</span>
+    </label>
+  `).join('');
+}
+
+function triggerPrint(sectionIds, { includeDate, includeFilters }) {
+  // Encabezado — fecha
+  const dateEl = document.getElementById('ph-date-val');
+  if (dateEl && includeDate) {
+    dateEl.textContent = new Date().toLocaleDateString('es-AR', {
+      day: 'numeric', month: 'long', year: 'numeric',
+    });
+  }
+
+  // Encabezado — filtros activos
+  const filtersBar = document.getElementById('ph-filters-bar');
+  const filtersText = document.getElementById('ph-filters-text');
+  if (filtersBar && filtersText && includeFilters) {
+    const parts = [];
+    if (state.anos[0]       !== 'all') parts.push('Años: ' + state.anos.join(', '));
+    if (state.meses[0]      !== 'all') parts.push('Meses: ' + state.meses.join(', '));
+    if (state.categorias[0] !== 'all') parts.push('Categorías: ' + state.categorias.join(', '));
+    if (state.productos[0]  !== 'all') parts.push('Productos: ' + state.productos.join(', '));
+    if (state.metric !== 'ventas')     parts.push('Métrica: cantidades');
+    filtersText.textContent = parts.length ? parts.join(' · ') : 'Sin filtros aplicados';
+    filtersBar.style.display = parts.length ? '' : 'none';
+  } else if (filtersBar) {
+    filtersBar.style.display = 'none';
+  }
+
+  // Marcar secciones seleccionadas
+  document.querySelectorAll('.page-section').forEach(s => s.classList.remove('print-include'));
+  sectionIds.forEach(id => {
+    document.getElementById(`section-${id}`)?.classList.add('print-include');
+  });
+
+  // Imprimir
+  setTimeout(() => {
+    window.print();
+    // Limpiar después de imprimir
+    const cleanup = () => {
+      document.querySelectorAll('.page-section').forEach(s => s.classList.remove('print-include'));
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+  }, 100);
+}
+
 // ── User menu toggle ───────────────────────────────────────────────────────
 function initUserMenu() {
   const btn      = document.getElementById('user-menu-btn');
@@ -2916,3 +3005,4 @@ initAuth().then(() => {
 initUserMenu();
 initModals();
 initCreateUser();
+initPrintModal();

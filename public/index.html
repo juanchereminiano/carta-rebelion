@@ -58,6 +58,28 @@
 <!-- Overlay mobile -->
 <div id="overlay" class="overlay"></div>
 
+<!-- ── Encabezado de impresión (solo visible al imprimir) ────────────────── -->
+<div class="print-header" id="print-header">
+  <div class="ph-top">
+    <div class="ph-brand-block">
+      <span class="ph-mark">✺</span>
+      <div class="ph-brand-text">
+        <div class="ph-name">REBELIÓN</div>
+        <div class="ph-tagline">CANTINA DEL BIEN · PALERMO · BUENOS AIRES</div>
+      </div>
+    </div>
+    <div class="ph-info-block">
+      <div class="ph-report-label">INFORME ANALÍTICO</div>
+      <div class="ph-date-val" id="ph-date-val"></div>
+    </div>
+  </div>
+  <div class="ph-accent-bar"></div>
+  <div class="ph-filters-bar" id="ph-filters-bar">
+    <span class="ph-filters-label">Filtros aplicados:</span>
+    <span id="ph-filters-text"></span>
+  </div>
+</div>
+
 <!-- ── Main ─────────────────────────────────────────────────────────────── -->
 <div class="app-layout">
 
@@ -80,6 +102,9 @@
         </button>
         <span id="refresh-status" class="refresh-status"></span>
       </div>
+
+      <!-- Botón imprimir -->
+      <button id="btn-print" class="btn-print" title="Generar informe PDF">🖨</button>
 
       <!-- Menú de usuario -->
       <div class="user-menu" id="user-menu">
@@ -121,6 +146,7 @@
 
     <!-- DASHBOARD ─────────────────────────────────────────────────────── -->
     <section id="section-dashboard" class="page-section active">
+      <div class="section-print-title">Dashboard Carta</div>
 
       <!-- KPIs -->
       <div id="summary-grid" class="summary-grid">
@@ -233,6 +259,7 @@
 
     <!-- TABLA ─────────────────────────────────────────────────────────── -->
     <section id="section-tabla" class="page-section">
+      <div class="section-print-title">Tabla de items</div>
       <div class="card">
         <div class="card-header-row">
           <h2>Todos los items</h2>
@@ -274,6 +301,7 @@
 
     <!-- MATRIZ BCG ────────────────────────────────────────────────────── -->
     <section id="section-bcg" class="page-section">
+      <div class="section-print-title">Matriz BCG</div>
       <div class="card">
         <div class="card-header-row">
           <h2>Posicionamiento de productos — adaptación BCG interna</h2>
@@ -293,6 +321,7 @@
 
     <!-- SEGUIMIENTO ──────────────────────────────────────────────────── -->
     <section id="section-seguimiento" class="page-section">
+      <div class="section-print-title">Seguimiento de productos</div>
 
       <!-- Buscador + filtros propios -->
       <div class="card seg-search-card">
@@ -351,6 +380,7 @@
 
     <!-- INFLACIÓN CARTA ──────────────────────────────────────────────── -->
     <section id="section-inflacion" class="page-section">
+      <div class="section-print-title">Inflación Carta</div>
 
       <!-- KPI cards anuales -->
       <div id="inf-annual-grid" class="inf-annual-grid"></div>
@@ -439,6 +469,7 @@
 
     <!-- TURNOS & HORARIOS ──────────────────────────────────────────────── -->
     <section id="section-turnos" class="page-section">
+      <div class="section-print-title">Turnos & Horarios</div>
 
       <!-- Filtros propios -->
       <div class="card seg-search-card">
@@ -644,6 +675,46 @@
     <div class="modal-footer">
       <button class="modal-btn-secondary" data-close="modal-reset">Cancelar</button>
       <button class="modal-btn-primary" id="reset-submit">Resetear</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Generar informe PDF ───────────────────────────────────────── -->
+<div id="modal-print" class="modal-overlay" style="display:none">
+  <div class="modal-box modal-box-wide">
+    <div class="modal-header">
+      <h3>🖨 Generar informe PDF</h3>
+      <button class="modal-close" data-close="modal-print">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:14px">
+        Seleccioná las secciones a incluir. El browser va a abrir el diálogo de impresión — elegí <strong>Guardar como PDF</strong>.
+      </p>
+
+      <div class="print-modal-label">Secciones</div>
+      <div class="print-sections-grid" id="print-sections-grid">
+        <!-- Se genera dinámicamente según el rol del usuario -->
+      </div>
+
+      <div class="print-modal-label" style="margin-top:16px">Opciones</div>
+      <div class="print-options-list">
+        <label class="print-opt-row">
+          <input type="checkbox" id="print-opt-date" checked />
+          <span>Incluir fecha de generación</span>
+        </label>
+        <label class="print-opt-row">
+          <input type="checkbox" id="print-opt-filters" checked />
+          <span>Incluir filtros activos</span>
+        </label>
+      </div>
+
+      <div id="print-warning" class="modal-error" style="display:none;margin-top:12px">
+        Seleccioná al menos una sección.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn-secondary" data-close="modal-print">Cancelar</button>
+      <button class="modal-btn-primary" id="btn-do-print">Generar PDF →</button>
     </div>
   </div>
 </div>

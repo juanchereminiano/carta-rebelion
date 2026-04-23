@@ -1281,6 +1281,43 @@ body {
   .top-table th:nth-child(5), .top-table td:nth-child(5) { display: none; }
 }
 
+/* ── Botón imprimir ──────────────────────────────────────────────────────── */
+.btn-print {
+  height: 32px; width: 32px; border-radius: 50%;
+  border: 1px solid var(--border); background: none;
+  font-size: 1rem; cursor: pointer; color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.btn-print:hover { background: var(--bg); color: var(--text); border-color: var(--text); }
+
+/* ── Modal imprimir ──────────────────────────────────────────────────────── */
+.print-modal-label {
+  font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--muted); margin-bottom: 8px;
+}
+.print-sections-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+}
+.print-section-row, .print-opt-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--border); cursor: pointer;
+  font-size: 0.82rem; transition: background 0.12s, border-color 0.12s;
+}
+.print-section-row:hover, .print-opt-row:hover {
+  background: rgba(43,94,173,0.05); border-color: var(--accent);
+}
+.print-section-row input, .print-opt-row input { accent-color: var(--accent); }
+.print-options-list { display: flex; flex-direction: column; gap: 6px; }
+
+/* ── Encabezado de impresión ─────────────────────────────────────────────── */
+.print-header { display: none; } /* oculto en pantalla */
+
+/* ── Títulos de sección (solo en print) ─────────────────────────────────── */
+.section-print-title { display: none; }
+
 /* ── Turnos & Horarios ───────────────────────────────────────────────────── */
 
 /* Cards de estación */
@@ -1426,4 +1463,131 @@ body {
 .hm-empty {
   background: var(--bg);
   color: var(--border);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ESTILOS DE IMPRESIÓN — Rebelión Brand
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media print {
+  /* Forzar colores de fondo */
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Ocultar toda la UI de navegación */
+  .sidebar, .overlay, .topbar, .filter-panel,
+  .btn-filter-toggle, .refresh-wrap, .user-menu,
+  .toast, .modal-overlay, .btn-print,
+  .seg-search-card, .seg-chips, .seg-suggestions, .seg-empty,
+  .inf-prod-empty, .seg-combined-card + .seg-grid > .seg-empty,
+  .tur-insight + *, .coming-soon,
+  .section-print-title ~ .card .seg-search-box,
+  #tur-ms-ano, #tur-ms-mes, #tur-ms-dia, #tur-ms-turno, #tur-btn-apply { display: none !important; }
+
+  /* Reset layout */
+  body { background: #fff !important; margin: 0; }
+  .app-layout { margin-left: 0 !important; }
+  .app-main { padding: 0 !important; }
+
+  /* Encabezado de marca — siempre visible */
+  .print-header {
+    display: block !important;
+    background: #2d290e;
+    color: #f7f7f0;
+    padding: 0;
+    margin-bottom: 24px;
+    page-break-after: avoid;
+  }
+  .ph-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 28px;
+  }
+  .ph-brand-block {
+    display: flex; align-items: center; gap: 16px;
+  }
+  .ph-mark {
+    font-size: 2rem; color: #f16300; line-height: 1;
+  }
+  .ph-name {
+    font-size: 1.5rem; font-weight: 900; letter-spacing: .15em;
+    color: #f7f7f0; font-family: Georgia, serif;
+  }
+  .ph-tagline {
+    font-size: 0.6rem; letter-spacing: .18em; color: rgba(247,247,240,0.55);
+    text-transform: uppercase; margin-top: 2px;
+  }
+  .ph-info-block {
+    text-align: right;
+  }
+  .ph-report-label {
+    font-size: 0.55rem; letter-spacing: .2em; color: rgba(247,247,240,0.45);
+    text-transform: uppercase; margin-bottom: 4px;
+  }
+  .ph-date-val {
+    font-size: 0.85rem; color: #f7f7f0; font-weight: 600;
+  }
+  .ph-accent-bar {
+    height: 4px;
+    background: linear-gradient(90deg, #f16300 0%, #004EA8 100%);
+  }
+  .ph-filters-bar {
+    background: rgba(0,78,168,0.2);
+    padding: 6px 28px;
+    font-size: 0.7rem; color: rgba(247,247,240,0.7);
+  }
+  .ph-filters-label { font-weight: 700; margin-right: 6px; }
+
+  /* Ocultar todas las secciones por defecto */
+  .page-section { display: none !important; }
+
+  /* Mostrar solo las seleccionadas */
+  .page-section.print-include {
+    display: block !important;
+    page-break-before: always;
+  }
+  .page-section.print-include:first-of-type {
+    page-break-before: avoid;
+  }
+
+  /* Título de sección visible en print */
+  .section-print-title {
+    display: block !important;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 1rem; font-weight: 700;
+    color: #004EA8;
+    border-bottom: 2px solid #f16300;
+    padding-bottom: 6px;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+
+  /* Cards — evitar que se corten entre páginas */
+  .card { page-break-inside: avoid; break-inside: avoid; margin-bottom: 14px; }
+  .two-col { page-break-inside: avoid; break-inside: avoid; }
+  .summary-grid { page-break-inside: avoid; }
+
+  /* Charts */
+  .chart-wrap { page-break-inside: avoid; break-inside: avoid; }
+  canvas { max-width: 100% !important; }
+
+  /* Tablas */
+  table { page-break-inside: auto; }
+  tr { page-break-inside: avoid; }
+  thead { display: table-header-group; }
+
+  /* Ocultar elementos interactivos dentro de secciones */
+  .seg-search-card { display: none !important; }
+  .card.seg-search-card { display: none !important; }
+  .coming-soon { display: none !important; }
+  #tur-heatmap .tur-heatmap { overflow: visible !important; }
+
+  /* Footer de página */
+  @page {
+    margin: 15mm 15mm 18mm 15mm;
+    size: A4;
+  }
 }
