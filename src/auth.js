@@ -23,7 +23,7 @@ const ROLE_LABELS = {
 const ROLE_CAN_REFRESH = {
   admin:    true,
   socio:    true,
-  gerencia: false,
+  gerencia: true,
   staff:    false,
 };
 
