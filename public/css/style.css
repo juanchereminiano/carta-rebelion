@@ -425,7 +425,7 @@ body {
 }
 .admin-new-user-form {
   display: grid;
-  grid-template-columns: 1fr 1fr 120px 1fr auto;
+  grid-template-columns: 1fr 1fr;
   gap: 8px; align-items: center;
 }
 .modal-input {
@@ -436,12 +436,7 @@ body {
 }
 .modal-input:focus { border-color: var(--accent); }
 .modal-select { cursor: pointer; }
-.admin-create-btn { white-space: nowrap; padding: 8px 16px; }
-
-@media (max-width: 640px) {
-  .admin-new-user-form { grid-template-columns: 1fr 1fr; }
-  .admin-create-btn    { grid-column: 1 / -1; }
-}
+.admin-create-btn { white-space: nowrap; padding: 8px 16px; grid-column: 1 / -1; }
 
 /* ── Main content ────────────────────────────────────────────────────────── */
 .app-main {
