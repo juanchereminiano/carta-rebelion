@@ -172,17 +172,14 @@ async function fetchCartaData() {
   const meta       = await sheets.spreadsheets.get({ spreadsheetId });
   const sheetList  = meta.data.sheets.map(s => s.properties.title);
 
-  // Elegir hoja principal (priorizar "mensuales", excluir "productos")
-  const isProductsSheet = name => PRODUCTS_SHEET_CANDIDATES.some(c =>
-    normalize(name).includes(normalize(c).split(' ').pop())
-  );
+  // Elegir hoja principal — lógica ORIGINAL sin cambios (para no romper nada)
   const sheetName = sheetList.find(name =>
-    !isProductsSheet(name) &&
     SHEET_CANDIDATES.some(c => normalize(name).includes(normalize(c).split(' ')[0]))
-  ) || sheetList.find(name => !isProductsSheet(name)) || sheetList[0];
+  ) || sheetList[0];
 
-  // Buscar hoja de productos (para lookup de mix)
+  // Buscar hoja de productos para mix lookup — debe ser DISTINTA de la hoja principal
   const prodSheetName = sheetList.find(name =>
+    name !== sheetName &&
     PRODUCTS_SHEET_CANDIDATES.some(c => normalize(name).includes(normalize(c).split(' ').pop()))
   );
 
