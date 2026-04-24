@@ -27,7 +27,7 @@ function applyEmpresaUI(emp) {
   if (nombreEl) nombreEl.textContent = emp.nombre;
 
   // Ícono del logo según empresa
-  const icons = { rebelion: '✺', temple: '◆', casatemple: '⌂', trenquecraft: '⬡' };
+  const icons = { rebelion: '✺', casarebelion: '⌂', temple: '◆', casatemple: '⌂', trenquecraft: '⬡' };
   const markEl = document.getElementById('sidebar-logo-mark');
   if (markEl) markEl.textContent = icons[emp.id] || '✺';
 

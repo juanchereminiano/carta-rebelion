@@ -142,10 +142,20 @@ function requireAuth(req, res, next) {
 
 // ── Catálogo de empresas ─────────────────────────────────────────────────────
 const EMPRESAS = {
-  rebelion:    { id: 'rebelion',    nombre: 'REBELIÓN',    color: '#f16300', activa: true  },
-  temple:      { id: 'temple',      nombre: 'TEMPLE SOHO', color: '#004EA8', activa: false },
-  casatemple:  { id: 'casatemple',  nombre: 'CASA TEMPLE', color: '#8B5E3C', activa: false },
-  trenquecraft:{ id: 'trenquecraft',nombre: 'TRENQUECRAFT',color: '#1a7f4e', activa: false },
+  rebelion:     { id: 'rebelion',     nombre: 'REBELIÓN',       color: '#f16300', activa: true  },
+  casarebelion: { id: 'casarebelion', nombre: 'CASA REBELIÓN',  color: '#c0392b', activa: true  },
+  temple:       { id: 'temple',       nombre: 'TEMPLE SOHO',    color: '#004EA8', activa: false },
+  casatemple:   { id: 'casatemple',   nombre: 'CASA TEMPLE',    color: '#8B5E3C', activa: false },
+  trenquecraft: { id: 'trenquecraft', nombre: 'TRENQUECRAFT',   color: '#1a7f4e', activa: false },
+};
+
+// Spreadsheet IDs por empresa (fallback al env var principal para rebelion)
+const EMPRESA_SHEET_IDS = {
+  rebelion:     process.env.CARTA_SPREADSHEET_ID,
+  casarebelion: process.env.CASA_REBELION_CARTA_SPREADSHEET_ID,
+  temple:       process.env.TEMPLE_CARTA_SPREADSHEET_ID,
+  casatemple:   process.env.CASATEMPLE_CARTA_SPREADSHEET_ID,
+  trenquecraft: process.env.TRENQUECRAFT_CARTA_SPREADSHEET_ID,
 };
 
 // ── Rutas públicas (sin autenticación) ───────────────────────────────────────
@@ -280,26 +290,33 @@ app.patch('/admin/users/:id/role', requireAdmin, (req, res) => {
 // ── Archivos estáticos (solo para usuarios autenticados) ──────────────────────
 app.use(express.static('public'));
 
-async function getData() {
-  const cached = cache.get('carta');
+async function getData(empresaId = 'rebelion') {
+  const key = `carta_${empresaId}`;
+  const cached = cache.get(key);
   if (cached) return cached;
-  const data = await fetchCartaData();
-  cache.set('carta', data);
+  const sheetId = EMPRESA_SHEET_IDS[empresaId];
+  if (!sheetId) throw new Error(`No hay spreadsheet configurada para "${empresaId}". Configurá la variable de entorno correspondiente.`);
+  const data = await fetchCartaData(sheetId);
+  cache.set(key, data);
   return data;
 }
 
-async function getTurnosData() {
-  const cached = turnosCache.get('turnos');
+async function getTurnosData(empresaId = 'rebelion') {
+  const key = `turnos_${empresaId}`;
+  const cached = turnosCache.get(key);
   if (cached) return cached;
-  const data = await fetchVentasHorarios();
-  turnosCache.set('turnos', data);
+  const sheetId = EMPRESA_SHEET_IDS[empresaId];
+  if (!sheetId) throw new Error(`No hay spreadsheet de turnos configurada para "${empresaId}".`);
+  const data = await fetchVentasHorarios(sheetId);
+  turnosCache.set(key, data);
   return data;
 }
 
 // Turnos & Horarios
 app.get('/api/turnos', async (req, res) => {
   try {
-    const allRecords = await getTurnosData();
+    const empresaId  = req.session?.empresa || 'rebelion';
+    const allRecords = await getTurnosData(empresaId);
     const parse = key => req.query[key] ? req.query[key].split(',').map(s => s.trim()) : ['all'];
     const anos  = parse('anos');
     const meses = parse('meses');
@@ -330,7 +347,8 @@ app.get('/api/turnos', async (req, res) => {
 // Query params: ?anos=2024,2025  &meses=ENERO,FEBRERO  &categorias=C1,C2  &productos=P1  &metric=ventas|cantidad
 app.get('/api/carta', async (req, res) => {
   try {
-    const { records } = await getData();
+    const empresaId = req.session?.empresa || 'rebelion';
+    const { records } = await getData(empresaId);
     const metric = req.query.metric || 'ventas';
 
     // Parsear parámetros — soporta comma-separated arrays
@@ -378,7 +396,8 @@ app.get('/api/carta', async (req, res) => {
 // Seguimiento — evolución mensual por producto (con filtros propios de año y mes)
 app.get('/api/seguimiento', async (req, res) => {
   try {
-    const { records } = await getData();
+    const empresaId = req.session?.empresa || 'rebelion';
+    const { records } = await getData(empresaId);
     const productos = req.query.productos ? req.query.productos.split(',').map(s => s.trim()).filter(Boolean) : [];
     const anos      = req.query.anos      ? req.query.anos.split(',').map(s => s.trim())      : ['all'];
     const meses     = req.query.meses     ? req.query.meses.split(',').map(s => s.trim())     : ['all'];
@@ -395,7 +414,8 @@ app.get('/api/seguimiento', async (req, res) => {
 // Info de hojas disponibles (debug)
 app.get('/api/meta', async (req, res) => {
   try {
-    const { sheetName, allSheets } = await getData();
+    const empresaId = req.session?.empresa || 'rebelion';
+    const { sheetName, allSheets } = await getData(empresaId);
     res.json({ sheetName, allSheets });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -414,11 +434,18 @@ app.get('/api/ipc', async (req, res) => {
   }
 });
 
-// Limpiar cache
+// Limpiar cache (toda o solo la empresa actual)
 app.post('/api/refresh', (req, res) => {
-  cache.flushAll();
-  ipcCache.flushAll();     // también limpia el IPC para forzar refetch
-  turnosCache.flushAll();  // limpia datos de turnos & horarios
+  const empresaId = req.session?.empresa;
+  if (empresaId) {
+    // Limpia solo las keys de la empresa activa
+    cache.del(`carta_${empresaId}`);
+    turnosCache.del(`turnos_${empresaId}`);
+  } else {
+    cache.flushAll();
+    turnosCache.flushAll();
+  }
+  ipcCache.flushAll();     // IPC siempre se limpia (es global)
   res.json({ ok: true });
 });
 

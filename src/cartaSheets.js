@@ -161,8 +161,8 @@ function parseRows(rows, mixLookup = {}) {
   return records;
 }
 
-async function fetchCartaData() {
-  const spreadsheetId = process.env.CARTA_SPREADSHEET_ID;
+async function fetchCartaData(spreadsheetId) {
+  if (!spreadsheetId) spreadsheetId = process.env.CARTA_SPREADSHEET_ID;
   if (!spreadsheetId) throw new Error('CARTA_SPREADSHEET_ID no está configurado en .env');
 
   const auth   = getAuthClient();
