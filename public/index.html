@@ -376,11 +376,31 @@
           <span class="seg-hint">Buscá y sumá los productos que querés monitorear</span>
         </div>
 
-        <!-- Buscador para agregar productos -->
+        <!-- Selector de categoría -->
+        <div class="seg-cat-row">
+          <span class="seg-filters-label">Por categoría:</span>
+          <select id="seg-cat-filter" class="select-input">
+            <option value="">Seleccioná una categoría...</option>
+          </select>
+        </div>
+
+        <!-- Lista de productos de la categoría seleccionada -->
+        <div id="seg-cat-products" class="seg-cat-products" style="display:none">
+          <div class="seg-cat-header">
+            <span id="seg-cat-title" class="seg-cat-title"></span>
+            <div style="display:flex;gap:8px">
+              <button class="seg-cat-action" id="seg-cat-select-all">Tildar todos</button>
+              <button class="seg-cat-action" id="seg-cat-clear-all">Destildar todos</button>
+            </div>
+          </div>
+          <div id="seg-cat-list" class="seg-cat-list"></div>
+        </div>
+
+        <!-- Separador o buscador por nombre -->
         <div class="seg-search-row">
           <div class="seg-search-box">
             <input id="seg-input" class="search-input seg-input" type="text"
-              placeholder="Buscar producto para agregar..." autocomplete="off" />
+              placeholder="O buscá un producto por nombre..." autocomplete="off" />
             <div id="seg-suggestions" class="seg-suggestions"></div>
           </div>
         </div>

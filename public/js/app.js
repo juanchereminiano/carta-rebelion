@@ -1714,6 +1714,7 @@ function renderSegChips() {
       segList.splice(Number(btn.dataset.idx), 1);
       saveSegList();
       renderSegChips();
+      renderSegCatProducts();   // re-sincronizar checkboxes
       loadSeguimiento();
     });
   });
@@ -1752,9 +1753,80 @@ function populateSegCatalog(cat) {
   // Llamado luego de cargar el catálogo global — llena los dropdowns del seguimiento
   if (segMsAno) segMsAno.setOptions(cat.anos.map(a => ({ value: String(a), text: String(a) })));
   if (segMsMes) segMsMes.setOptions(cat.meses.map(m => ({ value: m, text: m.charAt(0) + m.slice(1).toLowerCase() })));
+
+  // Poblar selector de categorías
+  const sel = document.getElementById('seg-cat-filter');
+  if (!sel) return;
+  const prevVal = sel.value;
+  sel.innerHTML = '<option value="">Seleccioná una categoría...</option>';
+  cat.categorias.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c;
+    opt.textContent = c.replace(/^\d+\s+/, '');
+    sel.appendChild(opt);
+  });
+  if (prevVal) { sel.value = prevVal; renderSegCatProducts(); }
+}
+
+function renderSegCatProducts() {
+  const sel       = document.getElementById('seg-cat-filter');
+  const panel     = document.getElementById('seg-cat-products');
+  const listEl    = document.getElementById('seg-cat-list');
+  const titleEl   = document.getElementById('seg-cat-title');
+  if (!sel || !panel || !listEl) return;
+
+  const cat = sel.value;
+  if (!cat) { panel.style.display = 'none'; return; }
+
+  const prods = catalog.productos.filter(p => p.categoria === cat);
+  if (!prods.length) { panel.style.display = 'none'; return; }
+
+  panel.style.display = '';
+  titleEl.textContent = cat.replace(/^\d+\s+/, '') + ` — ${prods.length} productos`;
+
+  function buildList() {
+    listEl.innerHTML = prods.map(p => {
+      const checked = segList.includes(p.producto);
+      return `
+        <label class="seg-cat-item${checked ? ' checked' : ''}">
+          <input type="checkbox" class="seg-cat-cb" data-prod="${escHtml(p.producto)}" ${checked ? 'checked' : ''} />
+          <span class="seg-cat-item-name">${escHtml(p.producto)}</span>
+        </label>`;
+    }).join('');
+
+    listEl.querySelectorAll('.seg-cat-cb').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const prod = cb.dataset.prod;
+        if (cb.checked) {
+          if (!segList.includes(prod)) { segList.push(prod); saveSegList(); }
+        } else {
+          const idx = segList.indexOf(prod);
+          if (idx >= 0) { segList.splice(idx, 1); saveSegList(); }
+        }
+        cb.closest('label').classList.toggle('checked', cb.checked);
+        renderSegChips();
+        loadSeguimiento();
+      });
+    });
+  }
+  buildList();
+
+  // Tildar / Destildar todos
+  document.getElementById('seg-cat-select-all').onclick = () => {
+    prods.forEach(p => { if (!segList.includes(p.producto)) segList.push(p.producto); });
+    saveSegList(); buildList(); renderSegChips(); loadSeguimiento();
+  };
+  document.getElementById('seg-cat-clear-all').onclick = () => {
+    prods.forEach(p => { const i = segList.indexOf(p.producto); if (i >= 0) segList.splice(i, 1); });
+    saveSegList(); buildList(); renderSegChips(); loadSeguimiento();
+  };
 }
 
 function initSegSearch() {
+  // Selector de categoría
+  const catSel = document.getElementById('seg-cat-filter');
+  if (catSel) catSel.addEventListener('change', renderSegCatProducts);
+
   const input       = document.getElementById('seg-input');
   const suggestions = document.getElementById('seg-suggestions');
   if (!input) return;

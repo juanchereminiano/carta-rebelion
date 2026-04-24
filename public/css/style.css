@@ -1096,6 +1096,57 @@ body {
 .seg-hint {
   font-size: 0.75rem; color: var(--muted); white-space: nowrap;
 }
+
+/* ── Filtro por categoría ──────────────────────────────────────────────────── */
+.seg-cat-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 12px;
+}
+.seg-cat-products {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.seg-cat-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px; flex-wrap: wrap; gap: 8px;
+}
+.seg-cat-title {
+  font-size: 0.8rem; font-weight: 700; color: var(--text);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.seg-cat-action {
+  background: none; border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px 10px; font-size: 0.72rem; font-weight: 600; color: var(--muted);
+  cursor: pointer; transition: border-color .15s, color .15s;
+}
+.seg-cat-action:hover { border-color: var(--accent); color: var(--accent); }
+
+.seg-cat-list {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.seg-cat-item {
+  display: flex; align-items: center; gap: 7px;
+  padding: 6px 12px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.78rem; color: var(--muted);
+  transition: border-color .15s, background .15s, color .15s;
+  user-select: none;
+}
+.seg-cat-item input[type=checkbox] { accent-color: var(--accent); cursor: pointer; }
+.seg-cat-item:hover { border-color: var(--accent); color: var(--text); }
+.seg-cat-item.checked {
+  border-color: var(--accent);
+  background: rgba(74,158,255,0.1);
+  color: var(--text);
+}
+.seg-cat-item-name { font-weight: 500; }
+
 .seg-search-row { margin-bottom: 10px; }
 
 /* Fila de filtros propios del seguimiento */
