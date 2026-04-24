@@ -654,6 +654,24 @@ body {
   border-radius: 4px; padding: 2px 5px; white-space: nowrap;
 }
 
+/* Mix tags */
+.mix-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.mix-tag.mix-bebida    { background: rgba(74,158,255,0.15);  color: #4a9eff; }
+.mix-tag.mix-comida    { background: rgba(56,217,169,0.15);  color: #38d9a9; }
+.mix-tag.mix-promos    { background: rgba(245,158,11,0.15);  color: #d97706; }
+.mix-tag.mix-mercado   { background: rgba(168,85,247,0.15);  color: #a855f7; }
+.mix-tag.mix-eventos   { background: rgba(244,63,94,0.15);   color: #f43f5e; }
+.mix-tag.mix-sin-clasificar { background: rgba(139,157,195,0.15); color: #8b9dc3; }
+
 /* ── Top tables (Dashboard) ──────────────────────────────────────────────── */
 .top-table td:nth-child(2) { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 960px) {

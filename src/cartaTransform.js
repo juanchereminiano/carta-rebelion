@@ -15,7 +15,7 @@ const CAT_COLORS = [
 // ── Filtro ─────────────────────────────────────────────────────────────────────
 // Soporta parámetros simples (ano/mes string) y arrays (anos/meses/categorias/productos)
 function filterRecords(records, filters = {}) {
-  const { anos, meses, categorias, productos, ano, mes } = filters;
+  const { anos, meses, categorias, productos, mixes, ano, mes } = filters;
 
   // Normalizar a arrays (null = sin filtro activo)
   const anosArr = anos && !anos.includes('all') ? anos.map(String)
@@ -24,12 +24,14 @@ function filterRecords(records, filters = {}) {
                  : (mes && mes !== 'all' ? [mes.toUpperCase()] : null);
   const catArr  = categorias && !categorias.includes('all') ? categorias : null;
   const prodArr = productos  && !productos.includes('all')  ? productos  : null;
+  const mixArr  = mixes && !mixes.includes('all') ? mixes : null;
 
   return records.filter(r => {
     if (anosArr  && !anosArr.includes(String(r.ano)))  return false;
     if (mesesArr && !mesesArr.includes(r.mes))         return false;
     if (catArr   && !catArr.includes(r.categoria))     return false;
     if (prodArr  && !prodArr.includes(r.producto))     return false;
+    if (mixArr   && !mixArr.includes(r.mix))           return false;
     return true;
   });
 }
@@ -69,6 +71,7 @@ function buildPareto(records, metric = 'ventas') {
       map[r.producto] = {
         producto:   r.producto,
         categoria:  r.categoria || '—',
+        mix:        r.mix || '—',
         ventas:     0,
         cantidad:   0,
       };
@@ -545,6 +548,91 @@ function buildProductEvolucion(records, productos = []) {
   return { labels, productos: resultado, totalProductos };
 }
 
+// ── Mix de ventas ──────────────────────────────────────────────────────────────
+// Paleta fija por tipo de mix
+const MIX_COLORS = {
+  'Bebida':          '#4a9eff',
+  'Comida':          '#38d9a9',
+  'Promos':          '#f59e0b',
+  'Mercado':         '#a855f7',
+  'Eventos':         '#f43f5e',
+  'Sin clasificar':  '#8b9dc3',
+};
+
+const MIX_ORDER = ['Comida', 'Bebida', 'Promos', 'Mercado', 'Eventos'];
+
+function buildMix(records, metric = 'ventas') {
+  const map = {};
+  for (const r of records) {
+    const mix = (r.mix && r.mix.trim()) ? r.mix.trim() : 'Sin clasificar';
+    if (!map[mix]) map[mix] = { nombre: mix, ventas: 0, cantidad: 0, items: new Set() };
+    map[mix].ventas   += r.dinero || 0;
+    map[mix].cantidad += r.cant   || 0;
+    map[mix].items.add(r.producto);
+  }
+
+  const key   = metric === 'cantidad' ? 'cantidad' : 'ventas';
+  const total = Object.values(map).reduce((s, m) => s + m[key], 0);
+
+  const result = Object.values(map).map(m => ({
+    nombre:   m.nombre,
+    ventas:   m.ventas,
+    cantidad: m.cantidad,
+    items:    m.items.size,
+    pct:      total > 0 ? Math.round(m[key] / total * 1000) / 10 : 0,
+    color:    MIX_COLORS[m.nombre] || '#8b9dc3',
+  }));
+
+  // Ordenar: primero los del orden canónico, luego los demás
+  result.sort((a, b) => {
+    const ia = MIX_ORDER.indexOf(a.nombre);
+    const ib = MIX_ORDER.indexOf(b.nombre);
+    if (ia >= 0 && ib >= 0) return ia - ib;
+    if (ia >= 0) return -1;
+    if (ib >= 0) return  1;
+    return b.ventas - a.ventas;
+  });
+
+  return { items: result, total };
+}
+
+function buildMixEvolucion(records) {
+  // Evolución mensual stacked por mix type
+  const mixMap  = {};
+  const timeMap = {};
+
+  for (const r of records) {
+    if (!r.ano || !r.mes) continue;
+    const mix  = (r.mix && r.mix.trim()) ? r.mix.trim() : 'Sin clasificar';
+    const mIdx = MES_ORDER.indexOf(r.mes);
+    if (mIdx < 0) continue;
+    const tKey = `${r.ano}-${String(mIdx).padStart(2, '0')}`;
+    timeMap[tKey] = { ano: r.ano, mes: r.mes };
+    if (!mixMap[mix]) mixMap[mix] = {};
+    if (!mixMap[mix][tKey]) mixMap[mix][tKey] = { ventas: 0, cantidad: 0 };
+    mixMap[mix][tKey].ventas   += r.dinero || 0;
+    mixMap[mix][tKey].cantidad += r.cant   || 0;
+  }
+
+  const allKeys = Object.keys(timeMap).sort();
+  const labels  = allKeys.map(k => `${timeMap[k].mes.slice(0, 3)} ${timeMap[k].ano}`);
+
+  // Ordenar los mix types canónicamente
+  const allMixes = [...new Set([...MIX_ORDER, ...Object.keys(mixMap)])].filter(m => mixMap[m]);
+
+  const datasets = {};
+  for (const mix of allMixes) {
+    if (!mixMap[mix]) continue;
+    datasets[mix] = {
+      ventas:   allKeys.map(k => mixMap[mix][k]?.ventas   || 0),
+      cantidad: allKeys.map(k => mixMap[mix][k]?.cantidad || 0),
+      color:    MIX_COLORS[mix] || '#8b9dc3',
+    };
+  }
+
+  return { labels, datasets };
+}
+
 module.exports = {
   filterRecords,
   buildSummary,
@@ -555,5 +643,7 @@ module.exports = {
   buildBCGData,
   buildProductEvolucion,
   buildInflacion,
+  buildMix,
+  buildMixEvolucion,
   MES_ORDER,
 };

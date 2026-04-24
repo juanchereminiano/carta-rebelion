@@ -141,6 +141,7 @@
     <div id="ms-mes"  class="ms-wrap"></div>
     <div id="ms-cat"  class="ms-wrap"></div>
     <div id="ms-prod" class="ms-wrap"></div>
+    <div id="ms-mix"  class="ms-wrap"></div>
     <div class="filter-chips metric-toggle">
       <button class="chip active" id="metric-ventas"   data-metric="ventas">$ Ventas</button>
       <button class="chip"        id="metric-cantidad" data-metric="cantidad">Cantidades</button>
@@ -198,6 +199,42 @@
         </div>
       </div>
 
+      <!-- Mix de Ventas -->
+      <div class="dash-section-label">Mix de Ventas</div>
+      <div class="two-col">
+        <div class="card">
+          <h2>Distribución por Mix</h2>
+          <div class="chart-wrap" style="position:relative;height:240px">
+            <canvas id="chart-mix-donut"></canvas>
+          </div>
+          <div id="mix-legend" class="cat-legend" style="margin-top:12px"></div>
+        </div>
+        <div class="card">
+          <h2>Detalle por Mix</h2>
+          <div class="table-wrap">
+            <table class="metrics-table" id="mix-table">
+              <thead>
+                <tr>
+                  <th style="text-align:left">Mix</th>
+                  <th>Items</th>
+                  <th>Ventas $</th>
+                  <th>Cantidad</th>
+                  <th>% total</th>
+                  <th>Precio prom.</th>
+                </tr>
+              </thead>
+              <tbody id="mix-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Evolución mensual por Mix</h2>
+        <div class="chart-wrap">
+          <canvas id="chart-mix-evolucion"></canvas>
+        </div>
+      </div>
+
       <!-- TOP 10 / TOP 11-20 -->
       <div class="two-col" id="dash-top-grid">
         <div class="card">
@@ -209,6 +246,7 @@
                   <th style="text-align:center;width:32px">#</th>
                   <th style="text-align:left">Producto</th>
                   <th style="text-align:left">Categoría</th>
+                  <th style="text-align:left">Mix</th>
                   <th>Ventas $</th>
                   <th>Cant.</th>
                   <th>% total</th>
@@ -228,6 +266,7 @@
                   <th style="text-align:center;width:32px">#</th>
                   <th style="text-align:left">Producto</th>
                   <th style="text-align:left">Categoría</th>
+                  <th style="text-align:left">Mix</th>
                   <th>Ventas $</th>
                   <th>Cant.</th>
                   <th>% total</th>

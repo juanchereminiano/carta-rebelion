@@ -157,6 +157,7 @@ function triggerPrint(sectionIds, { includeDate, includeFilters }) {
     if (state.meses[0]      !== 'all') parts.push('Meses: ' + state.meses.join(', '));
     if (state.categorias[0] !== 'all') parts.push('Categorías: ' + state.categorias.join(', '));
     if (state.productos[0]  !== 'all') parts.push('Productos: ' + state.productos.join(', '));
+    if (state.mixes[0]      !== 'all') parts.push('Mix: ' + state.mixes.join(', '));
     if (state.metric !== 'ventas')     parts.push('Métrica: cantidades');
     filtersText.textContent = parts.length ? parts.join(' · ') : 'Sin filtros aplicados';
     filtersBar.style.display = parts.length ? '' : 'none';
@@ -507,6 +508,7 @@ const state = {
   meses:      ['all'],
   categorias: ['all'],
   productos:  ['all'],
+  mixes:      ['all'],
   metric:     'ventas',
   // Tabla
   sortCol: 'rank', sortDir: 'asc',
@@ -711,7 +713,7 @@ class MultiSelect {
 }
 
 // Instancias
-let msAno, msMes, msCat, msProd;
+let msAno, msMes, msCat, msProd, msMix;
 
 // ── Filter panel toggle (mobile/tablet) ────────────────────────────────────
 function initFilterToggle() {
@@ -744,6 +746,7 @@ function updateFilterBadge() {
   if (!state.meses.includes('all'))      count++;
   if (!state.categorias.includes('all')) count++;
   if (!state.productos.includes('all'))  count++;
+  if (!state.mixes.includes('all'))      count++;
   if (count > 0) {
     badge.textContent = count;
     badge.style.display = 'inline-flex';
@@ -882,6 +885,11 @@ function initFilters() {
     searchable: true,
     onChange: vals => { state.productos = vals; updateFilterBadge(); loadData(); },
   });
+  msMix = new MultiSelect({
+    container: document.getElementById('ms-mix'),
+    label: 'Mix',
+    onChange: vals => { state.mixes = vals; updateFilterBadge(); loadData(); },
+  });
 }
 
 function _refreshProductOptions() {
@@ -902,6 +910,9 @@ function populateCatalog(cat) {
   msMes.setOptions(cat.meses.map(m     => ({ value: m, text: m.charAt(0) + m.slice(1).toLowerCase() })));
   msCat.setOptions(cat.categorias.map(c => ({ value: c, text: c })));
   _refreshProductOptions();
+  if (cat.mixes && msMix) {
+    msMix.setOptions(cat.mixes.map(m => ({ value: m, text: m })));
+  }
 }
 
 // Métrica
@@ -1289,15 +1300,17 @@ function renderDashTopTables(items) {
   const isV = state.metric === 'ventas';
 
   function buildRows(slice, startRank) {
-    if (!slice.length) return `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">Sin datos</td></tr>`;
+    if (!slice.length) return `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px">Sin datos</td></tr>`;
     return slice.map((item, i) => {
       const rank = startRank + i;
       const rankColor = rank === 1 ? '#c8a84b' : rank <= 3 ? '#4a9eff' : 'var(--muted)';
+      const mixClass = (item.mix || '').toLowerCase().replace(/\s/g, '-');
       return `
         <tr>
           <td style="text-align:center;font-weight:700;color:${rankColor};font-size:0.78rem">${rank}</td>
           <td style="text-align:left;color:var(--text);font-weight:500;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.producto}</td>
           <td style="text-align:left"><span class="cat-tag">${(item.categoria||'').replace(/^\d+\s+/,'')}</span></td>
+          <td style="text-align:left"><span class="mix-tag mix-${mixClass}">${item.mix||'—'}</span></td>
           <td>${isV ? fmt.pesosFull(item.ventas) : fmt.num(item.cantidad)}</td>
           <td style="color:var(--muted)">${fmt.num(item.cantidad)}</td>
           <td>${fmt.pct(item.pct)}</td>
@@ -2549,6 +2562,110 @@ function renderInfProdCards(data) {
   });
 }
 
+// ── MIX DE VENTAS ──────────────────────────────────────────────────────────
+
+function renderMix(mixData, mixEvolucion) {
+  const { items, total } = mixData;
+  const isV = state.metric === 'ventas';
+
+  // Donut chart
+  upsertChart('chart-mix-donut', {
+    type: 'doughnut',
+    data: {
+      labels: items.map(m => m.nombre),
+      datasets: [{
+        data: items.map(m => isV ? m.ventas : m.cantidad),
+        backgroundColor: items.map(m => m.color),
+        borderWidth: 0,
+        hoverOffset: 6,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '60%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
+          label: ctx => {
+            const m = items[ctx.dataIndex];
+            return ` ${isV ? fmt.pesosFull(ctx.parsed) : fmt.num(ctx.parsed)}  (${m.pct}%)`;
+          },
+        }},
+      },
+    },
+  });
+
+  // Legend
+  document.getElementById('mix-legend').innerHTML = items.map(m => `
+    <div class="cat-legend-item">
+      <div class="cat-legend-dot" style="background:${m.color}"></div>
+      <span>${m.nombre} <strong style="color:var(--text)">${m.pct}%</strong></span>
+    </div>
+  `).join('');
+
+  // Tabla
+  document.getElementById('mix-tbody').innerHTML = items.map(m => `
+    <tr>
+      <td style="text-align:left">
+        <span style="display:inline-flex;align-items:center;gap:7px">
+          <span style="width:10px;height:10px;border-radius:50%;background:${m.color};flex-shrink:0"></span>
+          <span style="font-weight:600;color:var(--text)">${m.nombre}</span>
+        </span>
+      </td>
+      <td>${m.items}</td>
+      <td>${fmt.pesosFull(m.ventas)}</td>
+      <td>${fmt.num(m.cantidad)}</td>
+      <td><strong>${fmt.pct(m.pct)}</strong></td>
+      <td>${m.ventas > 0 && m.cantidad > 0 ? fmt.pesosFull(Math.round(m.ventas / m.cantidad)) : '—'}</td>
+    </tr>
+  `).join('');
+
+  // Evolución stacked bar por mix
+  if (mixEvolucion && mixEvolucion.labels && mixEvolucion.datasets) {
+    const { labels, datasets } = mixEvolucion;
+    const dsKeys = Object.keys(datasets);
+
+    upsertChart('chart-mix-evolucion', {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: dsKeys.map(mix => ({
+          label:           mix,
+          data:            isV ? datasets[mix].ventas : datasets[mix].cantidad,
+          backgroundColor: datasets[mix].color + 'cc',
+          borderColor:     datasets[mix].color,
+          borderWidth:     0,
+          borderRadius:    2,
+          stack:           'mix',
+        })),
+      },
+      options: {
+        responsive: true, maintainAspectRatio: true, aspectRatio: 2.8,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: CHART_DEFAULTS.legend('bottom'),
+          tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
+            label: ctx => {
+              const v = ctx.parsed.y;
+              return ` ${ctx.dataset.label}: ${isV ? fmt.pesosFull(v) : fmt.num(v) + ' uds'}`;
+            },
+          }},
+        },
+        scales: {
+          x: CHART_DEFAULTS.scaleX,
+          y: {
+            ...CHART_DEFAULTS.scaleY,
+            stacked: true,
+            ticks: { color: '#7b7f94',
+              callback: v => isV ? '$'+(v>=1e6?(v/1e6).toFixed(1)+'M':(v>=1e3?(v/1e3).toFixed(0)+'k':v)) : fmt.num(v),
+            },
+          },
+        },
+      },
+    });
+  }
+}
+
 // ── Render completo ────────────────────────────────────────────────────────
 
 function renderAll(data) {
@@ -2580,6 +2697,9 @@ function renderAll(data) {
   // Inflación Carta
   renderInflacion(data.inflacion, _indecData);
 
+  // Mix de Ventas
+  if (data.mix) renderMix(data.mix, data.mixEvolucion);
+
   // Timestamp
   const now = new Date().toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' });
   document.getElementById('last-update').textContent = `Act. ${now}`;
@@ -2601,6 +2721,7 @@ async function loadData({ forceFlush = false } = {}) {
     if (!state.meses.includes('all'))      params.set('meses',      state.meses.join(','));
     if (!state.categorias.includes('all')) params.set('categorias', state.categorias.join(','));
     if (!state.productos.includes('all'))  params.set('productos',  state.productos.join(','));
+    if (!state.mixes.includes('all'))      params.set('mixes',      state.mixes.join(','));
 
     const data = await fetch(`/api/carta?${params}`).then(r => r.json());
     if (data.error) throw new Error(data.error);

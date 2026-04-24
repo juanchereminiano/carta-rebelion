@@ -18,6 +18,8 @@ const {
   buildBCGData,
   buildProductEvolucion,
   buildInflacion,
+  buildMix,
+  buildMixEvolucion,
 } = require('./src/cartaTransform');
 const { fetchVentasHorarios } = require('./src/ventasHorariosSheets');
 const {
@@ -341,8 +343,9 @@ app.get('/api/carta', async (req, res) => {
     const meses      = parse('meses', 'mes');
     const categorias = parse('categorias');
     const productos  = parse('productos');
+    const mixes      = parse('mixes');
 
-    const filtered = filterRecords(records, { anos, meses, categorias, productos });
+    const filtered = filterRecords(records, { anos, meses, categorias, productos, mixes });
 
     // Catálogo completo (sin filtros) para los dropdowns del cliente
     const allRecords = records;
@@ -350,17 +353,20 @@ app.get('/api/carta', async (req, res) => {
       anos:       [...new Set(allRecords.map(r => r.ano).filter(Boolean))].sort().map(String),
       meses:      [...new Set(allRecords.map(r => r.mes).filter(Boolean))],
       categorias: [...new Set(allRecords.map(r => r.categoria).filter(Boolean))].sort(),
+      mixes:      [...new Set(allRecords.map(r => r.mix).filter(Boolean))].sort(),
       productos:  buildTopItems(allRecords, 9999).map(i => ({ producto: i.producto, categoria: i.categoria })),
     };
 
     res.json({
-      summary:    buildSummary(filtered),
-      pareto:     buildPareto(filtered, metric),
-      categorias: buildCategories(filtered, metric),
-      evolucion:  buildEvolucion(filtered),
-      topItems:   buildTopItems(filtered, 30),
-      bcgData:    buildBCGData(records),
-      inflacion:  buildInflacion(records),   // sin filtros — historia completa
+      summary:      buildSummary(filtered),
+      pareto:       buildPareto(filtered, metric),
+      categorias:   buildCategories(filtered, metric),
+      evolucion:    buildEvolucion(filtered),
+      topItems:     buildTopItems(filtered, 30),
+      bcgData:      buildBCGData(records),
+      inflacion:    buildInflacion(records),   // sin filtros — historia completa
+      mix:          buildMix(filtered, metric),
+      mixEvolucion: buildMixEvolucion(filtered),
       catalog,
     });
   } catch (err) {

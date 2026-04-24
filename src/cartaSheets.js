@@ -9,6 +9,14 @@ const SHEET_CANDIDATES = [
   'Sheet1',
 ];
 
+// Candidatos para la hoja de productos/mix (catálogo de artículos)
+const PRODUCTS_SHEET_CANDIDATES = [
+  'BASE VENTAS PRODUCTOS',
+  'VENTAS PRODUCTOS',
+  'BASE PRODUCTOS',
+  'PRODUCTOS',
+];
+
 function getAuthClient() {
   if (process.env.GOOGLE_CREDENTIALS_BASE64) {
     const credentials = JSON.parse(
@@ -104,7 +112,7 @@ function levenshtein(a, b) {
   return dp[m][n];
 }
 
-function parseRows(rows) {
+function parseRows(rows, mixLookup = {}) {
   // Buscar fila de encabezados (contiene "año" o "ano")
   let headerIdx = -1;
   for (let i = 0; i < Math.min(rows.length, 5); i++) {
@@ -128,6 +136,7 @@ function parseRows(rows) {
   // "Dinero" puede estar en varias columnas; tomamos la primera que matchea
   const idxDin   = headers.findIndex(h => h === 'dinero' || h.includes('venta') || h === 'total');
   const idxPrecio = headers.findIndex(h => h.includes('precio'));
+  const idxMix   = headers.findIndex(h => h === 'mix' || h.includes('mix') || h === 'tipo');
 
   const records = [];
   for (let i = headerIdx + 1; i < rows.length; i++) {
@@ -142,10 +151,11 @@ function parseRows(rows) {
     const cant     = idxCant >= 0 ? parseValue(row[idxCant] || '') : null;
     const dinero   = idxDin >= 0 ? parseValue(row[idxDin] || '') : null;
     const precioPromedio = idxPrecio >= 0 ? parseValue(row[idxPrecio] || '') : null;
+    const mix      = (idxMix >= 0 ? decodeEntities((row[idxMix] || '').trim()) : '') || mixLookup[producto] || '';
 
     if (!producto || !mes) continue;
 
-    records.push({ ano, mes, categoria, codigo, producto, cant, dinero, precioPromedio });
+    records.push({ ano, mes, categoria, codigo, producto, cant, dinero, precioPromedio, mix });
   }
 
   return records;
@@ -162,18 +172,53 @@ async function fetchCartaData() {
   const meta       = await sheets.spreadsheets.get({ spreadsheetId });
   const sheetList  = meta.data.sheets.map(s => s.properties.title);
 
-  // Elegir la hoja correcta
+  // Elegir hoja principal (priorizar "mensuales", excluir "productos")
+  const isProductsSheet = name => PRODUCTS_SHEET_CANDIDATES.some(c =>
+    normalize(name).includes(normalize(c).split(' ').pop())
+  );
   const sheetName = sheetList.find(name =>
+    !isProductsSheet(name) &&
     SHEET_CANDIDATES.some(c => normalize(name).includes(normalize(c).split(' ')[0]))
-  ) || sheetList[0];
+  ) || sheetList.find(name => !isProductsSheet(name)) || sheetList[0];
+
+  // Buscar hoja de productos (para lookup de mix)
+  const prodSheetName = sheetList.find(name =>
+    PRODUCTS_SHEET_CANDIDATES.some(c => normalize(name).includes(normalize(c).split(' ').pop()))
+  );
+
+  const mixLookup = {};
+  if (prodSheetName) {
+    try {
+      const prodResp = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${prodSheetName}!A1:Z2000`,
+      });
+      const prodRows = prodResp.data.values || [];
+      if (prodRows.length > 0) {
+        const hdr = (prodRows[0] || []).map(h => normalize(h));
+        const iProd = hdr.findIndex(h => h === 'producto' || h.includes('product'));
+        const iMix  = hdr.findIndex(h => h === 'mix' || h.includes('mix') || h === 'tipo');
+        if (iProd >= 0 && iMix >= 0) {
+          for (let i = 1; i < prodRows.length; i++) {
+            const row = prodRows[i] || [];
+            const prod = decodeEntities((row[iProd] || '').trim());
+            const mix  = decodeEntities((row[iMix]  || '').trim());
+            if (prod && mix) mixLookup[prod] = mix;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('No se pudo leer hoja de productos para mix lookup:', e.message);
+    }
+  }
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${sheetName}!A1:J10000`,
+    range: `${sheetName}!A1:L10000`,
   });
 
   const rows    = response.data.values || [];
-  const records = parseRows(rows);
+  const records = parseRows(rows, mixLookup);
 
   return { records, sheetName, allSheets: sheetList };
 }
