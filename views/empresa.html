@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grupo Soho · Seleccionar empresa</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-family: system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', sans-serif;
+      padding: 40px 20px 60px;
+      background: #f0edf8;
+      background-image:
+        radial-gradient(ellipse 120% 80% at 0% 0%, rgba(180,160,240,0.25) 0%, transparent 55%),
+        radial-gradient(ellipse 100% 80% at 100% 100%, rgba(100,200,210,0.2) 0%, transparent 55%);
+    }
+
+    /* ── Header ── */
+    .emp-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      margin-bottom: 48px;
+    }
+    .emp-header img {
+      width: 100px;
+      height: auto;
+    }
+    .emp-header-text {
+      text-align: center;
+    }
+    .emp-header-text h1 {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #1e3a6e;
+      letter-spacing: -0.02em;
+    }
+    .emp-header-text p {
+      font-size: 0.82rem;
+      color: rgba(30, 58, 110, 0.5);
+      margin-top: 6px;
+    }
+
+    /* ── Grid de empresas ── */
+    .emp-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      width: 100%;
+      max-width: 760px;
+    }
+
+    .emp-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 32px 28px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      overflow: hidden;
+      text-decoration: none;
+    }
+    .emp-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 36px rgba(0,0,0,0.13);
+    }
+    .emp-card.unavailable {
+      opacity: 0.52;
+      cursor: default;
+    }
+    .emp-card.unavailable:hover {
+      transform: none;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+    }
+
+    /* Barra de color izquierda */
+    .emp-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 5px;
+      border-radius: 18px 0 0 18px;
+      background: var(--emp-color);
+    }
+    .emp-card:hover { border-color: var(--emp-color); }
+
+    .emp-icon {
+      font-size: 2.2rem;
+      line-height: 1;
+    }
+    .emp-name {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #1e3a6e;
+      letter-spacing: 0.02em;
+    }
+    .emp-desc {
+      font-size: 0.75rem;
+      color: rgba(30, 58, 110, 0.5);
+      line-height: 1.4;
+    }
+    .emp-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: color-mix(in srgb, var(--emp-color) 12%, transparent);
+      color: var(--emp-color);
+      width: fit-content;
+      margin-top: 4px;
+    }
+    .emp-badge.prox {
+      background: rgba(30, 58, 110, 0.07);
+      color: rgba(30, 58, 110, 0.4);
+    }
+    .emp-arrow {
+      position: absolute;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 1.1rem;
+      color: var(--emp-color);
+      opacity: 0;
+      transition: opacity 0.15s, right 0.15s;
+    }
+    .emp-card:not(.unavailable):hover .emp-arrow {
+      opacity: 1;
+      right: 16px;
+    }
+
+    /* ── User info ── */
+    .emp-user-bar {
+      margin-top: 40px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.78rem;
+      color: rgba(30, 58, 110, 0.5);
+    }
+    .emp-user-name {
+      font-weight: 600;
+      color: #1e3a6e;
+    }
+    .emp-logout {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 0.75rem;
+      color: rgba(30,58,110,0.4);
+      padding: 4px 10px;
+      border-radius: 6px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .emp-logout:hover { background: rgba(0,78,168,0.08); color: #004EA8; }
+
+    /* ── Error ── */
+    .emp-error {
+      margin-top: 20px;
+      padding: 10px 18px;
+      background: rgba(220,50,50,0.07);
+      border: 1px solid rgba(220,50,50,0.2);
+      border-radius: 8px;
+      color: #c03030;
+      font-size: 0.82rem;
+      display: none;
+    }
+    .emp-error.show { display: block; }
+
+    @media (max-width: 600px) {
+      .emp-grid { grid-template-columns: 1fr; max-width: 400px; }
+      .emp-header-text h1 { font-size: 1.2rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="emp-header">
+  <img src="/img/grupo-soho-logo.png" alt="Grupo Soho" />
+  <div class="emp-header-text">
+    <h1>¿Qué empresa querés analizar?</h1>
+    <p>Seleccioná una de las empresas del grupo para continuar</p>
+  </div>
+</div>
+
+<div class="emp-grid" id="emp-grid">
+  <!-- Cards se insertan por JS según las empresas disponibles -->
+</div>
+
+<div class="emp-error" id="emp-error"></div>
+
+<div class="emp-user-bar">
+  <span>Conectado como <span class="emp-user-name" id="emp-username">—</span></span>
+  <span>·</span>
+  <button class="emp-logout" id="emp-logout-btn">Cerrar sesión</button>
+</div>
+
+<script>
+  const EMPRESAS = [
+    {
+      id:      'rebelion',
+      icon:    '✺',
+      nombre:  'REBELIÓN',
+      desc:    'Cantina del bien · Palermo · Buenos Aires',
+      color:   '#f16300',
+      activa:  true,
+    },
+    {
+      id:      'temple',
+      icon:    '◆',
+      nombre:  'TEMPLE SOHO',
+      desc:    'Palermo Soho · Buenos Aires',
+      color:   '#004EA8',
+      activa:  false,
+    },
+    {
+      id:      'casatemple',
+      icon:    '⌂',
+      nombre:  'CASA TEMPLE',
+      desc:    'Palermo · Buenos Aires',
+      color:   '#8B5E3C',
+      activa:  false,
+    },
+    {
+      id:      'trenquecraft',
+      icon:    '⬡',
+      nombre:  'TRENQUECRAFT',
+      desc:    'Trenque Lauquen · Buenos Aires',
+      color:   '#1a7f4e',
+      activa:  false,
+    },
+  ];
+
+  // Render cards
+  const grid = document.getElementById('emp-grid');
+  grid.innerHTML = EMPRESAS.map(e => `
+    <div class="emp-card${e.activa ? '' : ' unavailable'}"
+         style="--emp-color: ${e.color}"
+         data-id="${e.id}"
+         role="${e.activa ? 'button' : 'presentation'}"
+         tabindex="${e.activa ? '0' : '-1'}">
+      <div class="emp-icon">${e.icon}</div>
+      <div class="emp-name">${e.nombre}</div>
+      <div class="emp-desc">${e.desc}</div>
+      <div class="emp-badge ${e.activa ? '' : 'prox'}">
+        ${e.activa ? '● Datos disponibles' : '○ Próximamente'}
+      </div>
+      <span class="emp-arrow">→</span>
+    </div>
+  `).join('');
+
+  // Click en card activa
+  grid.querySelectorAll('.emp-card:not(.unavailable)').forEach(card => {
+    const select = async () => {
+      const id = card.dataset.id;
+      const err = document.getElementById('emp-error');
+      err.classList.remove('show');
+      try {
+        const res = await fetch('/api/empresa/select', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ empresa: id }),
+        });
+        if (res.ok) {
+          window.location.href = '/';
+        } else {
+          const d = await res.json();
+          err.textContent = d.error || 'Error al seleccionar empresa';
+          err.classList.add('show');
+        }
+      } catch {
+        err.textContent = 'No se pudo conectar al servidor.';
+        err.classList.add('show');
+      }
+    };
+    card.addEventListener('click', select);
+    card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') select(); });
+  });
+
+  // User info
+  fetch('/auth/me').then(r => r.json()).then(u => {
+    if (u?.name) document.getElementById('emp-username').textContent = u.name;
+  }).catch(() => {});
+
+  // Logout
+  document.getElementById('emp-logout-btn').addEventListener('click', async () => {
+    await fetch('/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
+  });
+</script>
+</body>
+</html>

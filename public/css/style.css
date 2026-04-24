@@ -2,15 +2,15 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  /* ── Paleta Rebelión — modo claro ── */
+  /* ── Paleta Grupo Soho ── */
   --bg:        #f4f1ec;   /* crema cálida */
   --surface:   #ffffff;   /* blanco */
-  --surface2:  #2b5ead;   /* sidebar azul cobalto Rebelión */
+  --surface2:  #1e3a6e;   /* sidebar azul marino Grupo Soho */
   --border:    #e0dbd2;   /* borde suave */
   --text:      #1a1a1a;   /* casi negro */
   --muted:     #7a7060;   /* marrón grisáceo */
-  --accent:    #2b5ead;   /* azul cobalto Rebelión */
-  --accent-hi: #3b72cc;   /* cobalto hover */
+  --accent:    #004EA8;   /* azul Grupo Soho */
+  --accent-hi: #0060cc;   /* azul hover */
   --gold:      #c8a84b;   /* dorado oliva */
   --radius:    10px;
   --gap:       16px;
@@ -130,6 +130,58 @@ body {
   transition: opacity 0.2s;
 }
 .sidebar.collapsed .last-update-side { opacity: 0; }
+
+/* ── Switcher de empresa ─────────────────────────────────────────────────── */
+.empresa-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% - 16px);
+  margin: 0 8px 10px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  cursor: pointer;
+  color: rgba(255,255,255,0.85);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+  overflow: hidden;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.empresa-switcher:hover {
+  background: rgba(255,255,255,0.13);
+  border-color: rgba(255,255,255,0.22);
+}
+.empresa-switcher-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--emp-color, #f16300);
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+.empresa-switcher-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 0.2s;
+}
+.empresa-switcher-arrow {
+  font-size: 0.85rem;
+  opacity: 0.5;
+  flex-shrink: 0;
+  transition: opacity 0.2s;
+}
+.sidebar.collapsed .empresa-switcher-label,
+.sidebar.collapsed .empresa-switcher-arrow { opacity: 0; }
+.sidebar.collapsed .empresa-switcher {
+  justify-content: center;
+  padding: 8px 0;
+}
 
 /* ── App layout ──────────────────────────────────────────────────────────── */
 .app-layout {

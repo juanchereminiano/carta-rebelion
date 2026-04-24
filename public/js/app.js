@@ -1,4 +1,44 @@
-/* ── CARTA REBELION — App ──────────────────────────────────────────────── */
+/* ── GRUPO SOHO — Analytics Dashboard ─────────────────────────────────── */
+
+// ── Empresa activa ─────────────────────────────────────────────────────────
+let currentEmpresa = null;  // { id, nombre, color, activa }
+
+async function initEmpresa() {
+  try {
+    const res = await fetch('/api/empresa/current');
+    if (!res.ok) return;
+    currentEmpresa = await res.json();
+    applyEmpresaUI(currentEmpresa);
+  } catch {}
+}
+
+function applyEmpresaUI(emp) {
+  if (!emp) return;
+  // Punto de color en el switcher
+  const dot = document.getElementById('empresa-dot');
+  if (dot) dot.style.setProperty('--emp-color', emp.color);
+
+  // Label del switcher
+  const label = document.getElementById('empresa-switcher-label');
+  if (label) label.textContent = emp.nombre;
+
+  // Nombre en el sidebar logo
+  const nombreEl = document.getElementById('sidebar-empresa-nombre');
+  if (nombreEl) nombreEl.textContent = emp.nombre;
+
+  // Ícono del logo según empresa
+  const icons = { rebelion: '✺', temple: '◆', casatemple: '⌂', trenquecraft: '⬡' };
+  const markEl = document.getElementById('sidebar-logo-mark');
+  if (markEl) markEl.textContent = icons[emp.id] || '✺';
+
+  // CSS custom property para el acento activo
+  document.documentElement.style.setProperty('--empresa-color', emp.color);
+}
+
+// Botón para cambiar de empresa
+document.getElementById('btn-switch-empresa')?.addEventListener('click', () => {
+  window.location.href = '/empresa';
+});
 
 // ── Auth — usuario actual ──────────────────────────────────────────────────
 let currentUser = null;   // { id, name, email, role, sections, canRefresh }
@@ -2999,6 +3039,7 @@ function renderHeatmap(data) {
 }
 
 // Iniciar
+initEmpresa();
 initAuth().then(() => {
   initFilterToggle();
   initFilters();

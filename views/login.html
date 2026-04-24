@@ -3,113 +3,126 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Carta Rebelión — Ingresar</title>
+  <title>Grupo Soho · Analytics</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       min-height: 100vh;
-      background: #0d0b08;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-family: system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', sans-serif;
       padding: 24px 16px;
+      background: #f0edf8;
       background-image:
-        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(200,168,75,0.08) 0%, transparent 70%);
+        radial-gradient(ellipse 120% 80% at 0% 0%, rgba(180,160,240,0.25) 0%, transparent 55%),
+        radial-gradient(ellipse 100% 80% at 100% 100%, rgba(100,200,210,0.2) 0%, transparent 55%);
     }
 
     .login-wrap {
       width: 100%;
-      max-width: 400px;
+      max-width: 420px;
       display: flex;
       flex-direction: column;
-      gap: 28px;
+      align-items: center;
+      gap: 32px;
     }
 
     /* ── Logo ── */
     .login-logo {
-      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
     }
-    .login-mark {
-      display: inline-block;
-      font-size: 3rem;
-      color: #c8a84b;
-      line-height: 1;
-      margin-bottom: 10px;
-      filter: drop-shadow(0 0 18px rgba(200,168,75,0.4));
+    .login-logo img {
+      width: 140px;
+      height: auto;
     }
-    .login-brand {
-      font-size: 1.45rem;
-      font-weight: 800;
-      color: #f5f0e8;
-      letter-spacing: 0.01em;
-    }
-    .login-brand-sub {
-      font-size: 0.68rem;
+    .login-tagline {
+      font-size: 0.72rem;
       font-weight: 600;
-      color: rgba(200,168,75,0.7);
-      letter-spacing: 0.18em;
+      color: #004EA8;
+      letter-spacing: 0.22em;
       text-transform: uppercase;
-      margin-top: 4px;
+      opacity: 0.7;
     }
 
     /* ── Card ── */
     .login-card {
-      background: #16130e;
-      border: 1px solid rgba(245,240,232,0.1);
-      border-radius: 16px;
-      padding: 36px 32px 32px;
-      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+      width: 100%;
+      background: #fff;
+      border: 1px solid rgba(0, 78, 168, 0.1);
+      border-radius: 20px;
+      padding: 40px 36px 36px;
+      box-shadow:
+        0 4px 24px rgba(0, 78, 168, 0.08),
+        0 1px 4px rgba(0, 0, 0, 0.04);
     }
 
     .login-card-title {
-      font-size: 1rem;
-      font-weight: 600;
-      color: rgba(245,240,232,0.75);
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #1e3a6e;
       text-align: center;
+      margin-bottom: 6px;
+      letter-spacing: -0.01em;
+    }
+    .login-card-sub {
+      font-size: 0.78rem;
+      color: rgba(30, 58, 110, 0.45);
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    /* ── Divisor ── */
+    .card-divider {
+      height: 3px;
+      border-radius: 2px;
+      background: linear-gradient(90deg, #004EA8 0%, #6ab0e8 100%);
       margin-bottom: 28px;
-      letter-spacing: 0.01em;
     }
 
     /* ── Fields ── */
-    .field { margin-bottom: 18px; }
-    .field:last-of-type { margin-bottom: 24px; }
+    .field { margin-bottom: 20px; }
+    .field:last-of-type { margin-bottom: 28px; }
 
     .field label {
       display: block;
       font-size: 0.68rem;
       font-weight: 700;
-      color: rgba(245,240,232,0.4);
+      color: rgba(30, 58, 110, 0.5);
       text-transform: uppercase;
       letter-spacing: 0.1em;
-      margin-bottom: 7px;
+      margin-bottom: 8px;
     }
 
     .field-wrap { position: relative; }
 
     .field input {
       width: 100%;
-      background: rgba(245,240,232,0.05);
-      border: 1px solid rgba(245,240,232,0.1);
+      background: #f5f7fb;
+      border: 1.5px solid rgba(0, 78, 168, 0.12);
       border-radius: 10px;
       padding: 13px 16px;
-      color: #f5f0e8;
+      color: #1e3a6e;
       font-size: 0.95rem;
       outline: none;
-      transition: border-color 0.2s, background 0.2s;
+      transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
       -webkit-appearance: none;
     }
     .field input:focus {
-      border-color: #c8a84b;
-      background: rgba(200,168,75,0.06);
+      border-color: #004EA8;
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(0, 78, 168, 0.1);
     }
-    .field input::placeholder { color: rgba(245,240,232,0.2); }
+    .field input::placeholder { color: rgba(30, 58, 110, 0.25); }
     .field input:-webkit-autofill {
-      -webkit-box-shadow: 0 0 0 100px #16130e inset;
-      -webkit-text-fill-color: #f5f0e8;
+      -webkit-box-shadow: 0 0 0 100px #f5f7fb inset;
+      -webkit-text-fill-color: #1e3a6e;
     }
-    .field input[type="password"] { padding-right: 44px; }
+    .field input[type="password"] { padding-right: 46px; }
 
     .eye-btn {
       position: absolute;
@@ -119,40 +132,47 @@
       background: none;
       border: none;
       cursor: pointer;
-      color: rgba(245,240,232,0.3);
-      font-size: 1.1rem;
+      color: rgba(30, 58, 110, 0.3);
+      font-size: 1.05rem;
       line-height: 1;
       padding: 4px;
       transition: color 0.15s;
     }
-    .eye-btn:hover { color: rgba(245,240,232,0.65); }
+    .eye-btn:hover { color: #004EA8; }
 
     /* ── Submit ── */
     .login-btn {
       width: 100%;
       padding: 14px;
-      background: #c8a84b;
-      color: #0d0b08;
+      background: #004EA8;
+      color: #fff;
       border: none;
       border-radius: 10px;
       font-size: 0.95rem;
-      font-weight: 800;
+      font-weight: 700;
       cursor: pointer;
       letter-spacing: 0.03em;
-      transition: background 0.2s, transform 0.1s, opacity 0.2s;
+      transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
     }
-    .login-btn:hover:not(:disabled) { background: #d6b85a; transform: translateY(-1px); }
-    .login-btn:active:not(:disabled) { transform: translateY(0); }
+    .login-btn:hover:not(:disabled) {
+      background: #0060cc;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(0, 78, 168, 0.3);
+    }
+    .login-btn:active:not(:disabled) { transform: translateY(0); box-shadow: none; }
     .login-btn:disabled { opacity: 0.55; cursor: not-allowed; }
     .login-btn.loading::after {
       content: '';
       display: inline-block;
       width: 14px; height: 14px;
-      border: 2px solid rgba(13,11,8,0.4);
-      border-top-color: #0d0b08;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
-      margin-left: 8px;
       vertical-align: middle;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -160,11 +180,11 @@
     /* ── Error ── */
     .login-error {
       margin-top: 14px;
-      background: rgba(224,60,90,0.1);
-      border: 1px solid rgba(224,60,90,0.25);
+      background: rgba(220,50,50,0.07);
+      border: 1px solid rgba(220,50,50,0.2);
       border-radius: 8px;
       padding: 10px 14px;
-      color: #e8607a;
+      color: #c03030;
       font-size: 0.82rem;
       line-height: 1.45;
       display: none;
@@ -174,12 +194,14 @@
     /* ── Footer ── */
     .login-footer {
       text-align: center;
-      font-size: 0.68rem;
-      color: rgba(245,240,232,0.2);
+      font-size: 0.65rem;
+      color: rgba(30, 58, 110, 0.35);
+      letter-spacing: 0.04em;
     }
 
     @media (max-width: 440px) {
-      .login-card { padding: 28px 20px 24px; border-radius: 12px; }
+      .login-card { padding: 28px 20px 24px; border-radius: 14px; }
+      .login-logo img { width: 110px; }
     }
   </style>
 </head>
@@ -188,18 +210,19 @@
 <div class="login-wrap">
 
   <div class="login-logo">
-    <div class="login-mark">✺</div>
-    <div class="login-brand">Carta Rebelión</div>
-    <div class="login-brand-sub">Analytics</div>
+    <img src="/img/grupo-soho-logo.png" alt="Grupo Soho" />
+    <div class="login-tagline">Analytics Dashboard</div>
   </div>
 
   <div class="login-card">
-    <div class="login-card-title">Ingresá a tu cuenta</div>
+    <div class="login-card-title">Bienvenido/a</div>
+    <div class="login-card-sub">Ingresá con tu cuenta para continuar</div>
+    <div class="card-divider"></div>
 
     <form id="login-form" novalidate>
       <div class="field">
         <label for="email">Email</label>
-        <input id="email" type="email" placeholder="usuario@rebelion.com"
+        <input id="email" type="email" placeholder="nombre@gruposoho.com"
           required autocomplete="email" inputmode="email" />
       </div>
 
@@ -219,19 +242,19 @@
     </form>
   </div>
 
-  <div class="login-footer">Carta Rebelión Analytics · Acceso restringido</div>
+  <div class="login-footer">Grupo Soho · Gastronomía + Cultura · Acceso restringido</div>
 
 </div>
 
 <script>
   // Toggle contraseña visible/oculta
-  const eyeBtn  = document.getElementById('eye-btn');
-  const eyeIcon = document.getElementById('eye-icon');
+  const eyeBtn   = document.getElementById('eye-btn');
+  const eyeIcon  = document.getElementById('eye-icon');
   const passInput = document.getElementById('password');
   let showPass = false;
   eyeBtn.addEventListener('click', () => {
     showPass = !showPass;
-    passInput.type  = showPass ? 'text' : 'password';
+    passInput.type = showPass ? 'text' : 'password';
     eyeIcon.textContent = showPass ? '◎' : '◉';
   });
 
@@ -242,7 +265,7 @@
     const err = document.getElementById('login-error');
     err.classList.remove('show');
     btn.disabled = true;
-    btn.textContent = 'Ingresando';
+    btn.textContent = 'Ingresando…';
     btn.classList.add('loading');
 
     try {
@@ -256,7 +279,8 @@
       });
       const data = await res.json();
       if (res.ok) {
-        window.location.href = '/';
+        // Siempre ir a /empresa para que el usuario seleccione la empresa
+        window.location.href = '/empresa';
       } else {
         err.textContent = data.error || 'Error al ingresar. Revisá tus datos.';
         err.classList.add('show');

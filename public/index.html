@@ -13,11 +13,17 @@
 <aside id="sidebar" class="sidebar">
   <div class="sidebar-header">
     <div class="sidebar-logo">
-      <span class="logo-mark">✺</span>
-      <span class="sidebar-logo-text">Carta Rebelión</span>
+      <span class="logo-mark" id="sidebar-logo-mark">✺</span>
+      <span class="sidebar-logo-text" id="sidebar-empresa-nombre">Carta Rebelión</span>
     </div>
     <button id="btn-collapse" class="btn-collapse" title="Colapsar menú">&#8249;</button>
   </div>
+  <!-- Switcher de empresa -->
+  <button class="empresa-switcher" id="btn-switch-empresa" title="Cambiar empresa">
+    <span class="empresa-switcher-dot" id="empresa-dot"></span>
+    <span class="empresa-switcher-label" id="empresa-switcher-label">Grupo Soho</span>
+    <span class="empresa-switcher-arrow">⇄</span>
+  </button>
 
   <nav class="sidebar-nav">
     <a class="nav-item active" data-section="dashboard">

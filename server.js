@@ -138,9 +138,17 @@ function requireAuth(req, res, next) {
   return res.redirect('/login');
 }
 
+// ── Catálogo de empresas ─────────────────────────────────────────────────────
+const EMPRESAS = {
+  rebelion:    { id: 'rebelion',    nombre: 'REBELIÓN',    color: '#f16300', activa: true  },
+  temple:      { id: 'temple',      nombre: 'TEMPLE SOHO', color: '#004EA8', activa: false },
+  casatemple:  { id: 'casatemple',  nombre: 'CASA TEMPLE', color: '#8B5E3C', activa: false },
+  trenquecraft:{ id: 'trenquecraft',nombre: 'TRENQUECRAFT',color: '#1a7f4e', activa: false },
+};
+
 // ── Rutas públicas (sin autenticación) ───────────────────────────────────────
 app.get('/login', (req, res) => {
-  if (req.session && req.session.userId) return res.redirect('/');
+  if (req.session && req.session.userId) return res.redirect('/empresa');
   res.sendFile(path.join(__dirname, 'views', 'login.html'));
 });
 
@@ -165,6 +173,32 @@ app.post('/auth/logout', (req, res) => {
 
 // ── Todo lo que sigue requiere autenticación ──────────────────────────────────
 app.use(requireAuth);
+
+// ── Selector de empresa (requiere auth, no requiere empresa seleccionada) ─────
+app.get('/empresa', (req, res) => {
+  res.sendFile(path.join(__dirname, 'views', 'empresa.html'));
+});
+
+app.post('/api/empresa/select', (req, res) => {
+  const { empresa } = req.body || {};
+  if (!empresa || !EMPRESAS[empresa])
+    return res.status(400).json({ error: 'Empresa inválida' });
+  if (!EMPRESAS[empresa].activa)
+    return res.status(400).json({ error: 'Empresa no disponible aún' });
+  req.session.empresa = empresa;
+  res.json({ ok: true, empresa: EMPRESAS[empresa] });
+});
+
+app.get('/api/empresa/current', (req, res) => {
+  const id = req.session?.empresa || 'rebelion';
+  res.json(EMPRESAS[id] || EMPRESAS.rebelion);
+});
+
+// ── Guard: / redirige a /empresa si no hay empresa seleccionada en sesión ─────
+app.get('/', (req, res, next) => {
+  if (!req.session.empresa) return res.redirect('/empresa');
+  next();
+});
 
 // ── Rutas autenticadas ─────────────────────────────────────────────────────
 app.get('/auth/me', (req, res) => {
