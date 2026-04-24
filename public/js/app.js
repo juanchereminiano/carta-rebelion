@@ -1340,7 +1340,8 @@ function renderTable() {
     if (state.clase    !== 'all' && item.clase      !== state.clase)    return false;
     if (state.tableCat !== 'all' && item.categoria  !== state.tableCat) return false;
     if (search && !item.producto.toLowerCase().includes(search) &&
-        !item.categoria.toLowerCase().includes(search)) return false;
+        !item.categoria.toLowerCase().includes(search) &&
+        !(item.mix||'').toLowerCase().includes(search)) return false;
     return true;
   });
 
@@ -1356,7 +1357,7 @@ function renderTable() {
   const isMobile = window.innerWidth <= 640;
 
   if (sorted.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted)">Sin resultados</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted)">Sin resultados</td></tr>`;
     return;
   }
 
@@ -1373,7 +1374,10 @@ function renderTable() {
                 <div class="item-card-name">${item.producto}</div>
                 <span class="badge-inline ${item.clase.toLowerCase()}">${item.clase}</span>
               </div>
-              <div class="item-card-cat"><span class="cat-tag">${item.categoria.replace(/^\d+\s+/, '')}</span></div>
+              <div class="item-card-cat">
+              ${item.mix ? `<span class="mix-tag mix-${item.mix.toLowerCase().replace(/\s+/g,'-')}">${item.mix}</span>` : ''}
+              <span class="cat-tag">${item.categoria.replace(/^\d+\s+/, '')}</span>
+            </div>
               <div class="item-card-stats">
                 <div class="item-card-stat">
                   <span class="item-stat-label">Ventas</span>
@@ -1408,6 +1412,7 @@ function renderTable() {
       <tr>
         <td style="color:var(--muted);font-size:0.75rem">${idx+1}</td>
         <td style="text-align:left;color:var(--text)">${item.producto}</td>
+        <td style="text-align:left">${item.mix ? `<span class="mix-tag mix-${item.mix.toLowerCase().replace(/\s+/g,'-')}">${item.mix}</span>` : '<span style="color:var(--muted);font-size:0.72rem">—</span>'}</td>
         <td style="text-align:left"><span class="cat-tag">${item.categoria.replace(/^\d+\s+/,'')}</span></td>
         <td>${fmt.pesosFull(item.ventas)}</td>
         <td>${fmt.num(item.cantidad)}</td>
