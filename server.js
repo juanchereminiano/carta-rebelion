@@ -171,6 +171,9 @@ app.post('/auth/logout', (req, res) => {
   req.session.destroy(() => res.json({ ok: true }));
 });
 
+// ── Archivos estáticos públicos (logos, etc. — accesibles sin auth) ──────────
+app.use('/img', express.static(path.join(__dirname, 'public', 'img')));
+
 // ── Todo lo que sigue requiere autenticación ──────────────────────────────────
 app.use(requireAuth);
 
