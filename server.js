@@ -23,6 +23,11 @@ const {
 } = require('./src/cartaTransform');
 const { fetchVentasHorarios } = require('./src/ventasHorariosSheets');
 const {
+  fetchCartaDataThinkion,
+  fetchVentasHorariosThinkion,
+  THINKION_CONFIG,
+} = require('./src/thinkionAPI');
+const {
   filterVentas,
   buildHourlyStats,
   buildShiftEvolucion,
@@ -146,7 +151,7 @@ const EMPRESAS = {
   casarebelion: { id: 'casarebelion', nombre: 'CASA REBELIÓN',  color: '#c0392b', activa: true  },
   temple:       { id: 'temple',       nombre: 'TEMPLE SOHO',    color: '#004EA8', activa: false },
   casatemple:   { id: 'casatemple',   nombre: 'CASA TEMPLE',    color: '#8B5E3C', activa: false },
-  trenquecraft: { id: 'trenquecraft', nombre: 'TRENQUECRAFT',   color: '#1a7f4e', activa: false },
+  trenquecraft: { id: 'trenquecraft', nombre: 'TRENQUECRAFT',   color: '#1a7f4e', activa: true  },
 };
 
 // Spreadsheet IDs por empresa (fallback al env var principal para rebelion)
@@ -290,13 +295,23 @@ app.patch('/admin/users/:id/role', requireAdmin, (req, res) => {
 // ── Archivos estáticos (solo para usuarios autenticados) ──────────────────────
 app.use(express.static('public'));
 
+// Empresas conectadas a Thinkion (en vez de Google Sheets)
+const THINKION_EMPRESAS = new Set(Object.keys(THINKION_CONFIG));
+
 async function getData(empresaId = 'rebelion') {
   const key = `carta_${empresaId}`;
   const cached = cache.get(key);
   if (cached) return cached;
-  const sheetId = EMPRESA_SHEET_IDS[empresaId];
-  if (!sheetId) throw new Error(`No hay spreadsheet configurada para "${empresaId}". Configurá la variable de entorno correspondiente.`);
-  const data = await fetchCartaData(sheetId);
+
+  let data;
+  if (THINKION_EMPRESAS.has(empresaId)) {
+    data = await fetchCartaDataThinkion(empresaId);
+  } else {
+    const sheetId = EMPRESA_SHEET_IDS[empresaId];
+    if (!sheetId) throw new Error(`No hay spreadsheet configurada para "${empresaId}". Configurá la variable de entorno correspondiente.`);
+    data = await fetchCartaData(sheetId);
+  }
+
   cache.set(key, data);
   return data;
 }
@@ -305,9 +320,16 @@ async function getTurnosData(empresaId = 'rebelion') {
   const key = `turnos_${empresaId}`;
   const cached = turnosCache.get(key);
   if (cached) return cached;
-  const sheetId = EMPRESA_SHEET_IDS[empresaId];
-  if (!sheetId) throw new Error(`No hay spreadsheet de turnos configurada para "${empresaId}".`);
-  const data = await fetchVentasHorarios(sheetId);
+
+  let data;
+  if (THINKION_EMPRESAS.has(empresaId)) {
+    data = await fetchVentasHorariosThinkion(empresaId);
+  } else {
+    const sheetId = EMPRESA_SHEET_IDS[empresaId];
+    if (!sheetId) throw new Error(`No hay spreadsheet de turnos configurada para "${empresaId}".`);
+    data = await fetchVentasHorarios(sheetId);
+  }
+
   turnosCache.set(key, data);
   return data;
 }
