@@ -153,38 +153,23 @@ async function thinkionRequest(code, token, payload, retries = 5) {
 }
 
 /**
- * Ejecuta tasks secuencialmente en series de `limit` a la vez.
- * Cada worker espera al anterior antes de tomar el siguiente.
- * Los errores por tarea se aíslan → devuelve [] para ese chunk y sigue.
+ * Ejecuta tasks de forma estrictamente secuencial con pausa entre cada una.
+ * Thinkion devuelve data:[] vacío (sin 429) cuando la saturamos — la única
+ * forma de evitarlo es ir de a uno con suficiente espacio entre requests.
  */
-async function pooled(tasks, limit = 3) {
-  const results = new Array(tasks.length).fill(null);
-  let i = 0;
-
-  async function worker(workerIdx) {
-    // Escalonamos el arranque de cada worker para no disparar todas las
-    // requests al mismo tiempo desde el inicio
-    await sleep(workerIdx * 600);
-
-    while (i < tasks.length) {
-      const idx = i++;
-      try {
-        results[idx] = await tasks[idx]();
-        // Pausa entre tareas del mismo worker para respetar rate limit
-        await sleep(500);
-      } catch (err) {
-        console.error(`[Thinkion] Error en chunk ${idx} (no fatal):`, err.message);
-        results[idx] = []; // chunk fallido → vacío, no rompe todo
-      }
+async function pooled(tasks, _limit, delayMs = 1500) {
+  const results = [];
+  for (let idx = 0; idx < tasks.length; idx++) {
+    try {
+      const rows = await tasks[idx]();
+      results.push(rows);
+    } catch (err) {
+      console.error(`[Thinkion] Error en chunk ${idx} (no fatal):`, err.message);
+      results.push([]);
     }
+    if (idx < tasks.length - 1) await sleep(delayMs);
   }
-
-  await Promise.all(
-    Array.from({ length: Math.min(limit, tasks.length) }, (_, wi) => worker(wi))
-  );
-
-  // Filtramos nulls por si alguna posición nunca se asignó
-  return results.filter(r => r !== null).flat();
+  return results.flat();
 }
 
 // ── Categorías manuales ───────────────────────────────────────────────────────
