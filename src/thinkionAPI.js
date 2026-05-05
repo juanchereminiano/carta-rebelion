@@ -98,7 +98,12 @@ function yearMonth(d) {
 function monthChunks(monthsBack = 24) {
   const chunks = [];
   const now    = new Date();
-  const currentYM = yearMonth(now);
+  const currentYM  = yearMonth(now);
+  const previousYM = yearMonth(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+
+  // Un mes se considera "cerrado" (cacheable) recién el día 6 del mes siguiente.
+  // Antes del día 6 el mes anterior todavía puede tener mesas abiertas.
+  const prevMonthSafe = now.getDate() >= 6;
 
   for (let i = 0; i < monthsBack; i++) {
     const firstDay = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -106,11 +111,15 @@ function monthChunks(monthsBack = 24) {
     const end      = lastDay > now ? now : lastDay;
     if (firstDay > now) continue;
     const ym = yearMonth(firstDay);
+
+    // Cerrado = no es el mes actual, Y si es el mes anterior solo si ya pasó el día 5
+    const closed = ym !== currentYM && !(ym === previousYM && !prevMonthSafe);
+
     chunks.push({
       date_init: fmtDate(firstDay),
       date_end:  fmtDate(end),
       yearMonth: ym,
-      closed:    ym !== currentYM,   // mes cerrado = nunca cambia
+      closed,
     });
   }
   return chunks;
