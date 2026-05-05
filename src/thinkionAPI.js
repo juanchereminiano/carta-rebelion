@@ -153,23 +153,38 @@ async function thinkionRequest(code, token, payload, retries = 5) {
 }
 
 /**
- * Ejecuta tasks en paralelo con límite de concurrencia.
- * Con un pequeño delay entre lanzamientos para no saturar la API.
+ * Ejecuta tasks secuencialmente en series de `limit` a la vez.
+ * Cada worker espera al anterior antes de tomar el siguiente.
+ * Los errores por tarea se aíslan → devuelve [] para ese chunk y sigue.
  */
 async function pooled(tasks, limit = 3) {
-  const results = new Array(tasks.length);
+  const results = new Array(tasks.length).fill(null);
   let i = 0;
 
-  async function worker() {
+  async function worker(workerIdx) {
+    // Escalonamos el arranque de cada worker para no disparar todas las
+    // requests al mismo tiempo desde el inicio
+    await sleep(workerIdx * 600);
+
     while (i < tasks.length) {
       const idx = i++;
-      if (idx > 0) await sleep(300); // 300 ms entre requests para no saturar
-      results[idx] = await tasks[idx]();
+      try {
+        results[idx] = await tasks[idx]();
+        // Pausa entre tareas del mismo worker para respetar rate limit
+        await sleep(500);
+      } catch (err) {
+        console.error(`[Thinkion] Error en chunk ${idx} (no fatal):`, err.message);
+        results[idx] = []; // chunk fallido → vacío, no rompe todo
+      }
     }
   }
 
-  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
-  return results.flat();
+  await Promise.all(
+    Array.from({ length: Math.min(limit, tasks.length) }, (_, wi) => worker(wi))
+  );
+
+  // Filtramos nulls por si alguna posición nunca se asignó
+  return results.filter(r => r !== null).flat();
 }
 
 // ── Categorías manuales ───────────────────────────────────────────────────────
@@ -223,14 +238,19 @@ async function fetchCartaDataThinkion(empresaId, monthsBack = 24) {
   });
 
   // ── Paso 3: ventas por producto × día (Report 320) — todos los meses ─────
-  const tasks = chunks.map(chunk => () => thinkionRequest(code, token, {
-    id_report:      320,
-    date_init:      chunk.date_init,
-    date_end:       chunk.date_end,
-    establishments,
-  }));
+  const tasks = chunks.map(chunk => async () => {
+    const rows = await thinkionRequest(code, token, {
+      id_report:      320,
+      date_init:      chunk.date_init,
+      date_end:       chunk.date_end,
+      establishments,
+    });
+    console.log(`[Thinkion/${empresaId}] Carta ${chunk.date_init}→${chunk.date_end}: ${rows.length} filas`);
+    return rows;
+  });
 
   const rawRows = await pooled(tasks, 3);
+  console.log(`[Thinkion/${empresaId}] Total filas carta: ${rawRows.length}`);
 
   // ── Paso 4: convertir a formato interno ──────────────────────────────────
   const records = [];
@@ -284,14 +304,19 @@ async function fetchVentasHorariosThinkion(empresaId, monthsBack = 24) {
   const { code, token, establishments } = cfg;
   const chunks = monthChunks(monthsBack);
 
-  const tasks = chunks.map(chunk => () => thinkionRequest(code, token, {
-    id_report:      294,
-    date_init:      chunk.date_init,
-    date_end:       chunk.date_end,
-    establishments,
-  }));
+  const tasks = chunks.map(chunk => async () => {
+    const rows = await thinkionRequest(code, token, {
+      id_report:      294,
+      date_init:      chunk.date_init,
+      date_end:       chunk.date_end,
+      establishments,
+    });
+    console.log(`[Thinkion/${empresaId}] Turnos ${chunk.date_init}→${chunk.date_end}: ${rows.length} filas`);
+    return rows;
+  });
 
   const rawRows = await pooled(tasks, 3);
+  console.log(`[Thinkion/${empresaId}] Total filas turnos: ${rawRows.length}`);
 
   const records = [];
   for (const row of rawRows) {

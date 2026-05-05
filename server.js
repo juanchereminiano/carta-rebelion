@@ -449,6 +449,50 @@ app.get('/api/meta', async (req, res) => {
   }
 });
 
+// Diagnóstico: qué meses tienen datos en Thinkion (admin only)
+app.get('/api/thinkion/diagnostico', requireAdmin, async (req, res) => {
+  try {
+    const empresaId = req.session?.empresa;
+    if (!THINKION_EMPRESAS.has(empresaId))
+      return res.status(400).json({ error: 'Solo disponible para empresas Thinkion' });
+
+    const { THINKION_CONFIG, monthChunks: _mc } = require('./src/thinkionAPI');
+    // Re-importamos helpers internos vía el módulo
+    const cfg    = THINKION_CONFIG[empresaId];
+    const chunks = (() => {
+      const now = new Date();
+      const result = [];
+      for (let i = 0; i < 24; i++) {
+        const first = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const last  = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+        const end   = last > now ? now : last;
+        if (first > now) continue;
+        const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        result.push({ date_init: fmt(first), date_end: fmt(end) });
+      }
+      return result;
+    })();
+
+    // Probamos solo el reporte 320 con una query liviana
+    const { thinkionRequest: _tr } = (() => {
+      // Accedemos a la función interna exportada de diagnóstico
+      const mod = require('./src/thinkionAPI');
+      return { thinkionRequest: mod._thinkionRequest };
+    })();
+
+    // Usamos la cache que ya tenemos para no re-pegar la API
+    const cacheKey = `carta_${empresaId}`;
+    const cached   = cache.get(cacheKey);
+    if (cached) {
+      const meses = [...new Set(cached.records.map(r => `${r.ano}-${r.mes}`))].sort();
+      return res.json({ ok: true, fuente: 'cache', meses, total_records: cached.records.length });
+    }
+    res.json({ ok: true, fuente: 'sin_cache', mensaje: 'Cargá primero el dashboard para poblar la cache, luego volvé aquí.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Reporte de productos sin categoría (solo empresas Thinkion, solo admin)
 app.get('/api/categorias/reporte', requireAdmin, async (req, res) => {
   try {
