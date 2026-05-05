@@ -149,8 +149,8 @@ function requireAuth(req, res, next) {
 const EMPRESAS = {
   rebelion:     { id: 'rebelion',     nombre: 'REBELIÓN',       color: '#f16300', activa: true  },
   casarebelion: { id: 'casarebelion', nombre: 'CASA REBELIÓN',  color: '#c0392b', activa: true  },
-  temple:       { id: 'temple',       nombre: 'TEMPLE SOHO',    color: '#004EA8', activa: false },
-  casatemple:   { id: 'casatemple',   nombre: 'CASA TEMPLE',    color: '#8B5E3C', activa: false },
+  temple:       { id: 'temple',       nombre: 'TEMPLE SOHO',    color: '#004EA8', activa: true  },
+  casatemple:   { id: 'casatemple',   nombre: 'CASA TEMPLE',    color: '#8B5E3C', activa: true  },
   trenquecraft: { id: 'trenquecraft', nombre: 'TRENQUECRAFT',   color: '#1a7f4e', activa: true  },
 };
 
