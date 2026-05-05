@@ -3,9 +3,14 @@
  * Reemplaza cartaSheets.js y ventasHorariosSheets.js para empresas conectadas
  * a Thinkion (thinkerp.cc).
  *
+ * Estrategia de persistencia:
+ *   - Meses CERRADOS (anteriores al mes actual) → guardados en JSON en disco.
+ *     Una vez descargados, nunca vuelven a consultarse a Thinkion.
+ *   - Mes ACTUAL → siempre fresco desde Thinkion (cambia a diario).
+ *
  * Reportes usados:
  *   320 → productos × día (carta principal)
- *   353 → productos × categoría (lookup — enriquecido con categorías manuales)
+ *   353 → productos × categoría (lookup)
  *   294 → hora × día × órdenes (turnos & horarios)
  */
 
@@ -20,33 +25,61 @@ const MES_NOMBRES = [
 ];
 const DIA_NOMBRES = ['LUNES','MARTES','MIERCOLES','JUEVES','VIERNES','SABADO','DOMINGO'];
 
+// ── Directorio de caché persistente ──────────────────────────────────────────
+// En Railway: configurá THINKION_DATA_DIR al mount path del volume (ej: /data)
+// En local:   usa ./data/thinkion-cache
+const DATA_DIR = process.env.THINKION_DATA_DIR
+  || path.join(__dirname, '..', 'data', 'thinkion-cache');
+
+function ensureDir(dir) {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+}
+
+/** Ruta del archivo de caché para una empresa + reporte + mes */
+function cacheFile(empresaId, report, yearMonth) {
+  const dir = path.join(DATA_DIR, empresaId);
+  ensureDir(dir);
+  return path.join(dir, `${report}-${yearMonth}.json`);
+}
+
+function readCache(file) {
+  try {
+    if (!fs.existsSync(file)) return null;
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch { return null; }
+}
+
+function writeCache(file, data) {
+  try { fs.writeFileSync(file, JSON.stringify(data), 'utf8'); }
+  catch (e) { console.warn('[Thinkion] No se pudo escribir caché:', e.message); }
+}
+
 // ── Config por empresa ────────────────────────────────────────────────────────
 const THINKION_CONFIG = {
   rebelion: {
     code:           'reb9',
     token:          process.env.THINKION_TOKEN_REBELION
                     || '55c0065e22774ec9fd13b587f43c8a94-999ea38ca43859e3af58269538f7c4e1-3e1a26e7ebdb1bd4886c9cfd5973f1da',
-    establishments: [1],   // REBELIÓN SOHO
+    establishments: [1],
   },
   trenquecraft: {
     code:           'tre9',
     token:          process.env.THINKION_TOKEN_TRENQUECRAFT
                     || '704575c0114c0ae51104b4712666e899-2b213d42f927c611d1c80fb871198384-4b882b11452f812b4b6dc5f5b0397c54',
-    establishments: [1],   // TRENQUECRAFT
+    establishments: [1],
   },
   temple: {
     code:           'tem9',
     token:          process.env.THINKION_TOKEN_TEMPLE
                     || 'a1734b322a79b5bfb6056e3a09d1c21b-f812f0b8965da81cc64414ebdf82eef0-8856ed7f2de7301fa4fee1b420689afd',
-    establishments: [3],   // SOHO
+    establishments: [3],
   },
   casatemple: {
     code:           'tem9',
     token:          process.env.THINKION_TOKEN_TEMPLE
                     || 'a1734b322a79b5bfb6056e3a09d1c21b-f812f0b8965da81cc64414ebdf82eef0-8856ed7f2de7301fa4fee1b420689afd',
-    establishments: [8],   // CASA TEMPLE
+    establishments: [8],
   },
-  // casarebelion → no está en Thinkion, usa Google Sheets (cartaSheets.js)
 };
 
 // ── Helpers de fecha ──────────────────────────────────────────────────────────
@@ -54,18 +87,31 @@ function fmtDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
+function yearMonth(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
 /**
- * Devuelve N meses de chunks (date_init / date_end) hacia atrás desde hoy.
+ * Devuelve los chunks de los últimos N meses.
+ * Marca cada chunk como "cerrado" si el mes ya terminó (no es el mes actual).
  */
 function monthChunks(monthsBack = 24) {
   const chunks = [];
   const now    = new Date();
+  const currentYM = yearMonth(now);
+
   for (let i = 0; i < monthsBack; i++) {
     const firstDay = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const lastDay  = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
     const end      = lastDay > now ? now : lastDay;
     if (firstDay > now) continue;
-    chunks.push({ date_init: fmtDate(firstDay), date_end: fmtDate(end) });
+    const ym = yearMonth(firstDay);
+    chunks.push({
+      date_init: fmtDate(firstDay),
+      date_end:  fmtDate(end),
+      yearMonth: ym,
+      closed:    ym !== currentYM,   // mes cerrado = nunca cambia
+    });
   }
   return chunks;
 }
@@ -81,7 +127,7 @@ function parseDating(str) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// ── HTTP helper con reintentos y backoff ──────────────────────────────────────
+// ── HTTP helper ───────────────────────────────────────────────────────────────
 function httpPost(url, token, payload) {
   return new Promise((resolve, reject) => {
     const body    = JSON.stringify(payload);
@@ -102,7 +148,6 @@ function httpPost(url, token, payload) {
       res.on('data', c => raw += c);
       res.on('end', () => {
         if (res.statusCode === 429) {
-          // Devolvemos un objeto especial para que thinkionRequest haga retry
           return resolve({ __rateLimit: true, retryAfter: parseInt(res.headers['retry-after'] || '10') });
         }
         try { resolve(JSON.parse(raw)); }
@@ -118,7 +163,7 @@ function httpPost(url, token, payload) {
 
 /**
  * Llama a un reporte paginando automáticamente.
- * Reintenta automáticamente en caso de 429 con backoff exponencial.
+ * Reintenta si recibe 429 explícito.
  */
 async function thinkionRequest(code, token, payload, retries = 5) {
   const allData = [];
@@ -126,21 +171,20 @@ async function thinkionRequest(code, token, payload, retries = 5) {
   let attempts  = 0;
 
   do {
-    if (attempts++ > 50) break; // safety cap
-
+    if (attempts++ > 50) break;
     const body = { ...payload };
     if (pageToken) body.page = pageToken;
 
     let result;
-    let backoff = 5000; // empieza en 5 s
+    let backoff = 5000;
 
     for (let r = 0; r <= retries; r++) {
       result = await httpPost(`https://${code}.thinkerp.cc/online/reporting/public/`, token, body);
       if (!result.__rateLimit) break;
       const wait = result.retryAfter ? result.retryAfter * 1000 : backoff;
-      console.warn(`[Thinkion] 429 rate limit — esperando ${wait / 1000}s (intento ${r + 1}/${retries})`);
+      console.warn(`[Thinkion] 429 — esperando ${wait / 1000}s (intento ${r + 1}/${retries})`);
       await sleep(wait);
-      backoff = Math.min(backoff * 2, 60000); // max 60 s
+      backoff = Math.min(backoff * 2, 60000);
     }
 
     if (result.__rateLimit) throw new Error('Thinkion: demasiados intentos con 429');
@@ -153,33 +197,42 @@ async function thinkionRequest(code, token, payload, retries = 5) {
 }
 
 /**
- * Ejecuta tasks de forma estrictamente secuencial con pausa entre cada una.
- * Thinkion devuelve data:[] vacío (sin 429) cuando la saturamos — la única
- * forma de evitarlo es ir de a uno con suficiente espacio entre requests.
+ * Fetch de un chunk con caché persistente.
+ * - Si el chunk está cerrado y ya está en disco → devuelve disco (sin llamar a Thinkion)
+ * - Si el chunk está cerrado y NO está en disco → llama a Thinkion, guarda en disco
+ * - Si el chunk es el mes actual → siempre llama a Thinkion (datos del día)
  */
-async function pooled(tasks, _limit, delayMs = 1500) {
-  const results = [];
-  for (let idx = 0; idx < tasks.length; idx++) {
-    try {
-      const rows = await tasks[idx]();
-      results.push(rows);
-    } catch (err) {
-      console.error(`[Thinkion] Error en chunk ${idx} (no fatal):`, err.message);
-      results.push([]);
+async function fetchChunkCached(empresaId, report, chunk, fetcher) {
+  if (chunk.closed) {
+    const file   = cacheFile(empresaId, report, chunk.yearMonth);
+    const cached = readCache(file);
+    if (cached !== null) {
+      console.log(`[Thinkion/${empresaId}] R${report} ${chunk.yearMonth}: cache local (${cached.length} filas)`);
+      return cached;
     }
-    if (idx < tasks.length - 1) await sleep(delayMs);
   }
-  return results.flat();
+
+  // Hay que buscar en Thinkion
+  let rows;
+  try {
+    rows = await fetcher();
+  } catch (err) {
+    console.error(`[Thinkion/${empresaId}] R${report} ${chunk.yearMonth}: error — ${err.message}`);
+    return [];
+  }
+
+  const label = chunk.closed ? 'nuevo→guardado' : 'mes actual';
+  console.log(`[Thinkion/${empresaId}] R${report} ${chunk.yearMonth}: ${rows.length} filas (${label})`);
+
+  // Solo guardar en disco si el mes está cerrado y vino con datos
+  if (chunk.closed && rows.length > 0) {
+    writeCache(cacheFile(empresaId, report, chunk.yearMonth), rows);
+  }
+
+  return rows;
 }
 
 // ── Categorías manuales ───────────────────────────────────────────────────────
-/**
- * Carga el archivo data/categorias-{empresaId}.json si existe.
- * Formato: { "123": "BEBIDAS", "456": "COCINA", ... }  (id_product → categoria)
- * También acepta nombre de producto como clave para mayor facilidad:
- * { "COCA COLA": "BEBIDAS" }
- * Las claves numéricas tienen prioridad sobre las de texto.
- */
 function loadManualCategories(empresaId) {
   const filePath = path.join(__dirname, '..', 'data', `categorias-${empresaId}.json`);
   try {
@@ -193,11 +246,6 @@ function loadManualCategories(empresaId) {
 }
 
 // ── Carta data ────────────────────────────────────────────────────────────────
-
-/**
- * Equivalente a fetchCartaData() para empresas Thinkion.
- * Devuelve { records, sheetName, allSheets }
- */
 async function fetchCartaDataThinkion(empresaId, monthsBack = 24) {
   const cfg = THINKION_CONFIG[empresaId];
   if (!cfg) throw new Error(`Empresa "${empresaId}" no tiene config Thinkion`);
@@ -205,41 +253,44 @@ async function fetchCartaDataThinkion(empresaId, monthsBack = 24) {
   const { code, token, establishments } = cfg;
   const chunks = monthChunks(monthsBack);
 
-  // ── Paso 1: categorías manuales (prioridad máxima) ───────────────────────
+  // ── Categorías manuales (prioridad máxima) ────────────────────────────────
   const manualCats = loadManualCategories(empresaId);
 
-  // ── Paso 2: lookup de categorías desde Thinkion (Report 353) ─────────────
+  // ── Lookup de categorías desde Thinkion (Report 353, solo mes actual) ─────
+  const currentChunk = chunks.find(c => !c.closed) || chunks[0];
   const catRows = await thinkionRequest(code, token, {
     id_report:      353,
-    date_init:      chunks[0].date_init,
-    date_end:       chunks[0].date_end,
+    date_init:      currentChunk.date_init,
+    date_end:       currentChunk.date_end,
     establishments,
   });
-
-  // Mapa: id_product → categoria (desde Thinkion, como fallback)
   const thinkionCatById = {};
   catRows.forEach(r => {
     if (r.id_product && r.category) thinkionCatById[String(r.id_product)] = r.category;
   });
 
-  // ── Paso 3: ventas por producto × día (Report 320) — todos los meses ─────
-  const tasks = chunks.map(chunk => async () => {
-    const rows = await thinkionRequest(code, token, {
-      id_report:      320,
-      date_init:      chunk.date_init,
-      date_end:       chunk.date_end,
-      establishments,
-    });
-    console.log(`[Thinkion/${empresaId}] Carta ${chunk.date_init}→${chunk.date_end}: ${rows.length} filas`);
-    return rows;
-  });
+  // ── Ventas por producto × día (Report 320) ────────────────────────────────
+  const allRows = [];
+  for (const chunk of chunks) {
+    const rows = await fetchChunkCached(empresaId, 320, chunk, () =>
+      thinkionRequest(code, token, {
+        id_report:      320,
+        date_init:      chunk.date_init,
+        date_end:       chunk.date_end,
+        establishments,
+      })
+    );
+    allRows.push(...rows);
+    // Pausa solo si vamos a Thinkion (mes actual o primera vez del cerrado)
+    // La pausa está implícita: fetchChunkCached es secuencial
+    if (!chunk.closed) await sleep(800);
+  }
 
-  const rawRows = await pooled(tasks, 3);
-  console.log(`[Thinkion/${empresaId}] Total filas carta: ${rawRows.length}`);
+  console.log(`[Thinkion/${empresaId}] Total carta: ${allRows.length} filas`);
 
-  // ── Paso 4: convertir a formato interno ──────────────────────────────────
+  // ── Convertir a formato interno ───────────────────────────────────────────
   const records = [];
-  for (const row of rawRows) {
+  for (const row of allRows) {
     const parsed = parseDating(row.dating);
     if (!parsed) continue;
     const { year, month1 } = parsed;
@@ -247,10 +298,9 @@ async function fetchCartaDataThinkion(empresaId, monthsBack = 24) {
     const dinero = parseFloat(row.sale)  || 0;
     if (!row.product || (!cant && !dinero)) continue;
 
-    const idStr = String(row.id_product || '');
+    const idStr  = String(row.id_product || '');
     const nombre = (row.product || '').trim().toUpperCase();
 
-    // Prioridad: manual por ID → manual por nombre → Thinkion → vacío
     const categoria =
       manualCats[idStr]  ||
       manualCats[nombre] ||
@@ -258,30 +308,26 @@ async function fetchCartaDataThinkion(empresaId, monthsBack = 24) {
       '';
 
     records.push({
-      ano:           year,
-      mes:           MES_NOMBRES[month1 - 1] || 'ENERO',
+      ano:            year,
+      mes:            MES_NOMBRES[month1 - 1] || 'ENERO',
       categoria,
-      codigo:        row.id_product ? parseInt(row.id_product) : null,
-      producto:      row.product,
+      codigo:         row.id_product ? parseInt(row.id_product) : null,
+      producto:       row.product,
       cant,
       dinero,
       precioPromedio: parseFloat(row.avg_price) || null,
-      mix:           '',
+      mix:            '',
     });
   }
 
   return {
     records,
     sheetName:  `Thinkion/${empresaId}`,
-    allSheets:  [`thinkion-${code}`],
+    allSheets:  [`thinkion-${THINKION_CONFIG[empresaId].code}`],
   };
 }
 
 // ── Turnos & Horarios data ────────────────────────────────────────────────────
-
-/**
- * Equivalente a fetchVentasHorarios() para empresas Thinkion.
- */
 async function fetchVentasHorariosThinkion(empresaId, monthsBack = 24) {
   const cfg = THINKION_CONFIG[empresaId];
   if (!cfg) throw new Error(`Empresa "${empresaId}" no tiene config Thinkion`);
@@ -289,22 +335,24 @@ async function fetchVentasHorariosThinkion(empresaId, monthsBack = 24) {
   const { code, token, establishments } = cfg;
   const chunks = monthChunks(monthsBack);
 
-  const tasks = chunks.map(chunk => async () => {
-    const rows = await thinkionRequest(code, token, {
-      id_report:      294,
-      date_init:      chunk.date_init,
-      date_end:       chunk.date_end,
-      establishments,
-    });
-    console.log(`[Thinkion/${empresaId}] Turnos ${chunk.date_init}→${chunk.date_end}: ${rows.length} filas`);
-    return rows;
-  });
+  const allRows = [];
+  for (const chunk of chunks) {
+    const rows = await fetchChunkCached(empresaId, 294, chunk, () =>
+      thinkionRequest(code, token, {
+        id_report:      294,
+        date_init:      chunk.date_init,
+        date_end:       chunk.date_end,
+        establishments,
+      })
+    );
+    allRows.push(...rows);
+    if (!chunk.closed) await sleep(800);
+  }
 
-  const rawRows = await pooled(tasks, 3);
-  console.log(`[Thinkion/${empresaId}] Total filas turnos: ${rawRows.length}`);
+  console.log(`[Thinkion/${empresaId}] Total turnos: ${allRows.length} filas`);
 
   const records = [];
-  for (const row of rawRows) {
+  for (const row of allRows) {
     const parsed = parseDating(row.dating);
     if (!parsed) continue;
     const { year, month1, day } = parsed;
@@ -337,18 +385,13 @@ async function fetchVentasHorariosThinkion(empresaId, monthsBack = 24) {
   return records;
 }
 
-// ── Export de reporte de productos sin categoría ──────────────────────────────
-/**
- * Devuelve la lista de productos únicos con su id y categoria actual.
- * Útil para generar el archivo de categorías manuales.
- */
+// ── Reporte de productos para mapeo de categorías ─────────────────────────────
 async function reporteProductosSinCategoria(empresaId) {
   const cfg = THINKION_CONFIG[empresaId];
   if (!cfg) throw new Error(`Empresa "${empresaId}" no tiene config Thinkion`);
 
   const { code, token, establishments } = cfg;
-  const chunks = monthChunks(3); // últimos 3 meses alcanza para el catálogo
-
+  const chunks = monthChunks(3);
   const manualCats = loadManualCategories(empresaId);
 
   const catRows = await thinkionRequest(code, token, {
@@ -361,13 +404,12 @@ async function reporteProductosSinCategoria(empresaId) {
   const productos = {};
   catRows.forEach(r => {
     if (!r.id_product) return;
-    const idStr  = String(r.id_product);
-    const nombre = (r.name || r.product || '').trim().toUpperCase();
+    const idStr       = String(r.id_product);
+    const nombre      = (r.name || r.product || '').trim().toUpperCase();
     const catThinkion = r.category || '';
     const catManual   = manualCats[idStr] || manualCats[nombre] || '';
-    productos[idStr] = {
-      id:             idStr,
-      nombre,
+    productos[idStr]  = {
+      id: idStr, nombre,
       categoriaThinkion: catThinkion,
       categoriaManual:   catManual,
       categoriaFinal:    catManual || catThinkion || '— sin categoría —',
