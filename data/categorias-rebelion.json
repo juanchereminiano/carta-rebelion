@@ -1,0 +1,4 @@
+{
+  "___instrucciones": "Clave: id_producto (número) o nombre exacto en mayúsculas. Valor: categoría. Los IDs tienen prioridad sobre los nombres.",
+  "___ejemplo": { "123": "BEBIDAS", "COCA COLA 500ML": "BEBIDAS" }
+}

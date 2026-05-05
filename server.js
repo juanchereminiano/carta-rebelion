@@ -25,6 +25,7 @@ const { fetchVentasHorarios } = require('./src/ventasHorariosSheets');
 const {
   fetchCartaDataThinkion,
   fetchVentasHorariosThinkion,
+  reporteProductosSinCategoria,
   THINKION_CONFIG,
 } = require('./src/thinkionAPI');
 const {
@@ -444,6 +445,20 @@ app.get('/api/meta', async (req, res) => {
     const { sheetName, allSheets } = await getData(empresaId);
     res.json({ sheetName, allSheets });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Reporte de productos sin categoría (solo empresas Thinkion, solo admin)
+app.get('/api/categorias/reporte', requireAdmin, async (req, res) => {
+  try {
+    const empresaId = req.session?.empresa;
+    if (!THINKION_EMPRESAS.has(empresaId))
+      return res.status(400).json({ error: 'Solo disponible para empresas Thinkion' });
+    const productos = await reporteProductosSinCategoria(empresaId);
+    res.json({ ok: true, empresa: empresaId, total: productos.length, productos });
+  } catch (err) {
+    console.error('Error /api/categorias/reporte:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
