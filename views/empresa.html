@@ -217,102 +217,69 @@
 </div>
 
 <script>
-  const EMPRESAS = [
-    {
-      id:     'rebelion',
-      icon:   null,
-      logo:   '/img/logo-rebelion.svg',
-      nombre: 'REBELIÓN',
-      desc:   'Cantina del bien · Palermo · Buenos Aires',
-      color:  '#f16300',
-      activa: true,
-    },
-    {
-      id:     'casarebelion',
-      icon:   null,
-      logo:   '/img/logo-rebelion.svg',
-      nombre: 'CASA REBELIÓN',
-      desc:   'Casa boutique · Palermo · Buenos Aires',
-      color:  '#c0392b',
-      activa: true,
-    },
-    {
-      id:     'temple',
-      icon:   null,
-      logo:   '/img/logo-temple.png',
-      nombre: 'TEMPLE SOHO',
-      desc:   'Palermo Soho · Buenos Aires',
-      color:  '#1a1a1a',
-      activa: false,
-    },
-    {
-      id:     'casatemple',
-      icon:   null,
-      logo:   '/img/logo-temple.png',
-      nombre: 'CASA TEMPLE',
-      desc:   'Palermo · Buenos Aires',
-      color:  '#1a1a1a',
-      activa: false,
-    },
-    {
-      id:     'trenquecraft',
-      icon:   null,
-      logo:   '/img/logo-trenquecraft.png',
-      nombre: 'TRENQUECRAFT',
-      desc:   'Trenque Lauquen · Buenos Aires',
-      color:  '#8B2B8B',
-      activa: false,
-    },
-  ];
+  // Metadatos visuales por empresa (logo e descripcion no vienen del servidor)
+  const EMPRESA_META = {
+    rebelion:     { logo: '/img/logo-rebelion.svg',     desc: 'Cantina del bien · Palermo · Buenos Aires' },
+    casarebelion: { logo: '/img/logo-rebelion.svg',     desc: 'Casa boutique · Palermo · Buenos Aires'    },
+    temple:       { logo: '/img/logo-temple.png',       desc: 'Palermo Soho · Buenos Aires'               },
+    casatemple:   { logo: '/img/logo-temple.png',       desc: 'Palermo · Buenos Aires'                    },
+    trenquecraft: { logo: '/img/logo-trenquecraft.png', desc: 'Trenque Lauquen · Buenos Aires'            },
+  };
 
-  // Render cards
-  const grid = document.getElementById('emp-grid');
-  grid.innerHTML = EMPRESAS.map(e => `
-    <div class="emp-card${e.activa ? '' : ' unavailable'}"
-         style="--emp-color: ${e.color}"
-         data-id="${e.id}"
-         role="${e.activa ? 'button' : 'presentation'}"
-         tabindex="${e.activa ? '0' : '-1'}">
-      ${e.logo
-        ? `<img class="emp-logo" src="${e.logo}" alt="${e.nombre}" />`
-        : `<div class="emp-icon">${e.icon}</div>`
-      }
-      <div class="emp-name">${e.nombre}</div>
-      <div class="emp-desc">${e.desc}</div>
-      <div class="emp-badge ${e.activa ? '' : 'prox'}">
-        ${e.activa ? '● Datos disponibles' : '○ Próximamente'}
-      </div>
-      <span class="emp-arrow">→</span>
-    </div>
-  `).join('');
+  async function init() {
+    // El estado activa/inactiva lo decide siempre el servidor
+    const empresas = await fetch('/api/empresas').then(r => r.json()).catch(() => []);
 
-  // Click en card activa
-  grid.querySelectorAll('.emp-card:not(.unavailable)').forEach(card => {
-    const select = async () => {
-      const id = card.dataset.id;
-      const err = document.getElementById('emp-error');
-      err.classList.remove('show');
-      try {
-        const res = await fetch('/api/empresa/select', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ empresa: id }),
-        });
-        if (res.ok) {
-          window.location.href = '/';
-        } else {
-          const d = await res.json();
-          err.textContent = d.error || 'Error al seleccionar empresa';
+    const grid = document.getElementById('emp-grid');
+    grid.innerHTML = empresas.map(e => {
+      const meta = EMPRESA_META[e.id] || {};
+      return `
+        <div class="emp-card${e.activa ? '' : ' unavailable'}"
+             style="--emp-color: ${e.color}"
+             data-id="${e.id}"
+             role="${e.activa ? 'button' : 'presentation'}"
+             tabindex="${e.activa ? '0' : '-1'}">
+          ${meta.logo
+            ? `<img class="emp-logo" src="${meta.logo}" alt="${e.nombre}" />`
+            : `<div class="emp-icon">🏢</div>`
+          }
+          <div class="emp-name">${e.nombre}</div>
+          <div class="emp-desc">${meta.desc || ''}</div>
+          <div class="emp-badge ${e.activa ? '' : 'prox'}">
+            ${e.activa ? '● Datos disponibles' : '○ Próximamente'}
+          </div>
+          <span class="emp-arrow">→</span>
+        </div>`;
+    }).join('');
+
+    // Click en card activa
+    grid.querySelectorAll('.emp-card:not(.unavailable)').forEach(card => {
+      const select = async () => {
+        const id  = card.dataset.id;
+        const err = document.getElementById('emp-error');
+        err.classList.remove('show');
+        try {
+          const res = await fetch('/api/empresa/select', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ empresa: id }),
+          });
+          if (res.ok) {
+            window.location.href = '/';
+          } else {
+            const d = await res.json();
+            err.textContent = d.error || 'Error al seleccionar empresa';
+            err.classList.add('show');
+          }
+        } catch {
+          err.textContent = 'No se pudo conectar al servidor.';
           err.classList.add('show');
         }
-      } catch {
-        err.textContent = 'No se pudo conectar al servidor.';
-        err.classList.add('show');
-      }
-    };
-    card.addEventListener('click', select);
-    card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') select(); });
-  });
+      };
+      card.addEventListener('click', select);
+      card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') select(); });
+    });
+  }
 
   // User info
   fetch('/auth/me').then(r => r.json()).then(u => {
@@ -324,6 +291,8 @@
     await fetch('/auth/logout', { method: 'POST' });
     window.location.href = '/login';
   });
+
+  init();
 </script>
 </body>
 </html>

@@ -214,6 +214,10 @@ app.get('/api/empresa/current', (req, res) => {
   res.json(EMPRESAS[id] || EMPRESAS.rebelion);
 });
 
+app.get('/api/empresas', (req, res) => {
+  res.json(Object.values(EMPRESAS));
+});
+
 // ── Guard: / redirige a /empresa si no hay empresa seleccionada en sesión ─────
 app.get('/', (req, res, next) => {
   if (!req.session.empresa) return res.redirect('/empresa');
