@@ -450,6 +450,40 @@ app.get('/api/meta', async (req, res) => {
   }
 });
 
+// Preview crudo de cualquier reporte Thinkion (admin) — para mapear campos
+app.get('/api/thinkion/preview', requireAdmin, async (req, res) => {
+  try {
+    const empresaId  = req.session?.empresa;
+    const reportId   = parseInt(req.query.id);
+    const days       = parseInt(req.query.days) || 7;
+    if (!THINKION_EMPRESAS.has(empresaId)) return res.status(400).json({ error: 'Solo Thinkion' });
+    if (!reportId) return res.status(400).json({ error: 'Falta ?id=NNN' });
+
+    const cfg  = THINKION_CONFIG[empresaId];
+    const now  = new Date();
+    const from = new Date(now); from.setDate(from.getDate() - days);
+    const fmt  = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+    // Llamada directa sin caché
+    const { _thinkionRequestRaw } = require('./src/thinkionAPI');
+    const rows = await _thinkionRequestRaw(cfg.code, cfg.token, {
+      id_report:      reportId,
+      date_init:      fmt(from),
+      date_end:       fmt(now),
+      establishments: cfg.establishments,
+    });
+
+    res.json({
+      ok: true, reportId, empresa: empresaId,
+      total: rows.length,
+      campos: rows.length ? Object.keys(rows[0]) : [],
+      muestra: rows.slice(0, 5),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Diagnóstico: estado de la caché local por empresa (admin only)
 app.get('/api/thinkion/diagnostico', requireAdmin, (req, res) => {
   try {

@@ -444,4 +444,5 @@ module.exports = {
   fetchVentasHorariosThinkion,
   reporteProductosSinCategoria,
   THINKION_CONFIG,
+  _thinkionRequestRaw: thinkionRequest,  // para el endpoint de preview/diagnóstico
 };
