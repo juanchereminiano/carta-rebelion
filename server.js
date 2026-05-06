@@ -25,6 +25,7 @@ const { fetchVentasHorarios } = require('./src/ventasHorariosSheets');
 const {
   fetchCartaDataThinkion,
   fetchVentasHorariosThinkion,
+  fetchMovimientosStock,
   reporteProductosSinCategoria,
   THINKION_CONFIG,
 } = require('./src/thinkionAPI');
@@ -598,6 +599,34 @@ app.post('/api/refresh', (req, res) => {
 // Página catálogo de productos
 app.get('/catalogo', (req, res) => {
   res.sendFile(path.join(__dirname, 'views', 'catalogo.html'));
+});
+
+// Página movimientos de stock
+app.get('/movimientos', (req, res) => {
+  res.sendFile(path.join(__dirname, 'views', 'movimientos.html'));
+});
+
+// API movimientos de stock
+const movCache = new NodeCache({ stdTTL: 300 }); // 5 min
+app.get('/api/movimientos', async (req, res) => {
+  try {
+    const empresaId = req.session?.empresa;
+    if (!empresaId) return res.status(400).json({ error: 'Sin empresa seleccionada' });
+    if (!THINKION_EMPRESAS.has(empresaId))
+      return res.status(400).json({ error: 'Solo disponible para empresas Thinkion' });
+
+    const months = parseInt(req.query.months) || 3;
+    const key    = `mov_${empresaId}_${months}`;
+    const cached = movCache.get(key);
+    if (cached) return res.json({ ok: true, records: cached });
+
+    const records = await fetchMovimientosStock(empresaId, months);
+    movCache.set(key, records);
+    res.json({ ok: true, records });
+  } catch (err) {
+    console.error('Error /api/movimientos:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));

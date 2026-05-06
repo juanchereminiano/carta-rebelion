@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Movimientos de Stock</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1e293b; min-height: 100vh; }
+    .layout { display: flex; min-height: 100vh; }
+    .sidebar { width: 220px; background: #1e3a6e; color: #fff; display: flex; flex-direction: column; padding: 24px 0; flex-shrink: 0; }
+    .sidebar-logo { padding: 0 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: .75rem; opacity: .6; text-transform: uppercase; letter-spacing: .08em; }
+    .sidebar-nav { padding: 16px 0; flex: 1; }
+    .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 10px 20px; color: rgba(255,255,255,.65); text-decoration: none; font-size: .82rem; font-weight: 500; border-left: 3px solid transparent; transition: background .15s; }
+    .sidebar-link:hover, .sidebar-link.active { background: rgba(255,255,255,.08); color: #fff; border-left-color: #60a5fa; }
+    .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .topbar { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .topbar h1 { font-size: 1rem; font-weight: 700; color: #1e3a6e; }
+    .content { padding: 24px 28px; flex: 1; }
+
+    /* KPIs */
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .kpi { background: #fff; border-radius: 12px; padding: 18px 20px; border: 1px solid #e2e8f0; }
+    .kpi-label { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin-bottom: 6px; }
+    .kpi-value { font-size: 1.5rem; font-weight: 800; color: #1e293b; }
+    .kpi-sub { font-size: .72rem; color: #94a3b8; margin-top: 2px; }
+
+    /* Toolbar */
+    .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    .search-box { flex: 1; min-width: 200px; max-width: 320px; position: relative; }
+    .search-box input { width: 100%; padding: 8px 12px 8px 32px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: .82rem; background: #fff; outline: none; }
+    .search-box input:focus { border-color: #60a5fa; }
+    .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+    .sel { padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: .82rem; background: #fff; cursor: pointer; outline: none; }
+    .sel:focus { border-color: #60a5fa; }
+    .badge { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 20px; padding: 4px 12px; font-size: .75rem; font-weight: 700; }
+
+    /* Tabla */
+    .table-wrap { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    thead { background: #f8fafc; }
+    th { padding: 10px 14px; text-align: left; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #64748b; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+    td { padding: 8px 14px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: .7rem; font-weight: 700; }
+    .tag-cp { background: #fee2e2; color: #b91c1c; }
+    .tag-evento { background: #fef3c7; color: #92400e; }
+    .tag-otro { background: #f1f5f9; color: #475569; }
+    .product-name { font-weight: 500; }
+    .muted { color: #94a3b8; font-size: .75rem; }
+    .loading-state, .empty-state { text-align: center; padding: 60px; color: #94a3b8; }
+    .spinner { width: 30px; height: 30px; border: 3px solid #e2e8f0; border-top-color: #1e3a6e; border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 12px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Motivos chart */
+    .motivos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 24px; }
+    .motivo-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; }
+    .motivo-card-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #64748b; margin-bottom: 4px; }
+    .motivo-card-value { font-size: 1.1rem; font-weight: 800; color: #1e293b; }
+    .motivo-card-items { font-size: .72rem; color: #94a3b8; margin-top: 2px; }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo" id="sidebar-empresa">—</div>
+    <nav class="sidebar-nav">
+      <a class="sidebar-link" href="/">📊 Dashboard Carta</a>
+      <a class="sidebar-link" href="/catalogo">📦 Catálogo</a>
+      <a class="sidebar-link active" href="/movimientos">📤 Stock</a>
+      <a class="sidebar-link" href="/empresa">⇄ Cambiar empresa</a>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <h1>📤 Movimientos de Stock (precio $0)</h1>
+      <div style="display:flex;gap:10px;align-items:center">
+        <select class="sel" id="months-sel">
+          <option value="1">Último mes</option>
+          <option value="3" selected>Últimos 3 meses</option>
+          <option value="6">Últimos 6 meses</option>
+          <option value="12">Último año</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- KPIs -->
+      <div class="kpis" id="kpis" style="display:none">
+        <div class="kpi">
+          <div class="kpi-label">Total movimientos</div>
+          <div class="kpi-value" id="kpi-total">—</div>
+          <div class="kpi-sub">registros en el período</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Costo estimado</div>
+          <div class="kpi-value" id="kpi-costo">—</div>
+          <div class="kpi-sub">a precio de lista</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Productos distintos</div>
+          <div class="kpi-value" id="kpi-prods">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Usuarios</div>
+          <div class="kpi-value" id="kpi-users">—</div>
+        </div>
+      </div>
+
+      <!-- Por motivo -->
+      <div class="motivos-grid" id="motivos-grid" style="display:none"></div>
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="search" placeholder="Buscar producto o motivo…" />
+        </div>
+        <select class="sel" id="filter-motivo">
+          <option value="">Motivo: Todos</option>
+        </select>
+        <select class="sel" id="filter-user">
+          <option value="">Usuario: Todos</option>
+        </select>
+        <span class="badge" id="count-badge">0 registros</span>
+      </div>
+
+      <!-- Tabla -->
+      <div class="table-wrap">
+        <div class="loading-state" id="loading"><div class="spinner"></div>Cargando…</div>
+        <div class="empty-state" id="empty" style="display:none">Sin movimientos en el período.</div>
+        <table id="table" style="display:none">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Producto</th>
+              <th class="text-center">Cant.</th>
+              <th class="text-right">P. Lista</th>
+              <th class="text-right">Costo total</th>
+              <th>Motivo</th>
+              <th>Notas</th>
+              <th>Usuario</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let allRecords = [];
+
+  async function load() {
+    const months = document.getElementById('months-sel').value;
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('table').style.display = 'none';
+    document.getElementById('empty').style.display = 'none';
+    document.getElementById('kpis').style.display = 'none';
+    document.getElementById('motivos-grid').style.display = 'none';
+
+    try {
+      const data = await fetch(`/api/movimientos?months=${months}`).then(r => r.json());
+      if (!data.ok) throw new Error(data.error);
+      allRecords = data.records || [];
+      buildFilters();
+      render();
+    } catch (err) {
+      document.getElementById('loading').innerHTML = `<p style="color:#dc2626">Error: ${err.message}</p>`;
+    }
+  }
+
+  function buildFilters() {
+    const motivos = [...new Set(allRecords.map(r => r.motivo).filter(Boolean))].sort();
+    const users   = [...new Set(allRecords.map(r => r.usuario).filter(Boolean))].sort();
+
+    const mSel = document.getElementById('filter-motivo');
+    mSel.innerHTML = '<option value="">Motivo: Todos</option>';
+    motivos.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; mSel.appendChild(o); });
+
+    const uSel = document.getElementById('filter-user');
+    uSel.innerHTML = '<option value="">Usuario: Todos</option>';
+    users.forEach(u => { const o = document.createElement('option'); o.value = u; o.textContent = u; uSel.appendChild(o); });
+  }
+
+  function getFiltered() {
+    const q = document.getElementById('search').value.trim().toLowerCase();
+    const m = document.getElementById('filter-motivo').value;
+    const u = document.getElementById('filter-user').value;
+    return allRecords.filter(r => {
+      if (q && !`${r.producto} ${r.motivo} ${r.notas}`.toLowerCase().includes(q)) return false;
+      if (m && r.motivo !== m) return false;
+      if (u && r.usuario !== u) return false;
+      return true;
+    });
+  }
+
+  function render() {
+    const filtered = getFiltered();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('count-badge').textContent = `${filtered.length} registros`;
+
+    // KPIs
+    const totalCosto = filtered.reduce((s, r) => s + r.costoTotal, 0);
+    const prods      = new Set(filtered.map(r => r.producto)).size;
+    const users      = new Set(filtered.map(r => r.usuario)).size;
+    document.getElementById('kpi-total').textContent = filtered.length.toLocaleString('es-AR');
+    document.getElementById('kpi-costo').textContent = '$' + fmt(totalCosto);
+    document.getElementById('kpi-prods').textContent = prods;
+    document.getElementById('kpi-users').textContent = users;
+    document.getElementById('kpis').style.display = 'grid';
+
+    // Por motivo
+    const byMotivo = {};
+    filtered.forEach(r => {
+      const k = r.motivo || 'Sin motivo';
+      if (!byMotivo[k]) byMotivo[k] = { costo: 0, items: 0 };
+      byMotivo[k].costo += r.costoTotal;
+      byMotivo[k].items += r.cantidad;
+    });
+    const motivosGrid = document.getElementById('motivos-grid');
+    motivosGrid.innerHTML = Object.entries(byMotivo)
+      .sort((a, b) => b[1].costo - a[1].costo)
+      .map(([k, v]) => `
+        <div class="motivo-card">
+          <div class="motivo-card-label">${esc(k)}</div>
+          <div class="motivo-card-value">$${fmt(v.costo)}</div>
+          <div class="motivo-card-items">${v.items} unidades</div>
+        </div>`).join('');
+    motivosGrid.style.display = 'grid';
+
+    if (!filtered.length) {
+      document.getElementById('table').style.display = 'none';
+      document.getElementById('empty').style.display = 'block';
+      return;
+    }
+    document.getElementById('empty').style.display = 'none';
+    document.getElementById('table').style.display = 'table';
+
+    // Ordenar por fecha desc
+    const sorted = [...filtered].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.hora - a.hora);
+
+    document.getElementById('tbody').innerHTML = sorted.map(r => {
+      const tagClass = /personal/i.test(r.motivo) ? 'tag-cp' : /banda|dj|evento/i.test(r.motivo) ? 'tag-evento' : 'tag-otro';
+      return `
+        <tr>
+          <td><span>${r.fecha}</span><br><span class="muted">${String(r.hora).padStart(2,'0')}:00</span></td>
+          <td class="product-name">${esc(r.producto)}</td>
+          <td class="text-center">${r.cantidad}</td>
+          <td class="text-right muted">$${r.precioLista.toLocaleString('es-AR')}</td>
+          <td class="text-right" style="font-weight:700">$${r.costoTotal.toLocaleString('es-AR')}</td>
+          <td><span class="tag ${tagClass}">${esc(r.motivo || '—')}</span></td>
+          <td class="muted">${esc(r.notas)}</td>
+          <td class="muted">${esc(r.usuario)}</td>
+        </tr>`;
+    }).join('');
+  }
+
+  function fmt(n) {
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return Math.round(n / 1e3) + 'K';
+    return n.toLocaleString('es-AR');
+  }
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Empresa en sidebar
+  fetch('/api/empresa/current').then(r => r.json()).then(e => {
+    if (e.nombre) document.getElementById('sidebar-empresa').textContent = e.nombre;
+  });
+
+  document.getElementById('months-sel').addEventListener('change', load);
+  ['search','filter-motivo','filter-user'].forEach(id => {
+    document.getElementById(id).addEventListener('input', render);
+  });
+
+  load();
+</script>
+</body>
+</html>

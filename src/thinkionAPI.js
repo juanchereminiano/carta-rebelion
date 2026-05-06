@@ -346,7 +346,21 @@ async function fetchCartaDataThinkion(empresaId, monthsBack = 24) {
   };
 }
 
-// ── Turnos & Horarios data ────────────────────────────────────────────────────
+/**
+ * Parsea "DD.MM.YYYY HH:MM" (formato Report 233 y 283).
+ * Devuelve { year, month1, day, hour }
+ */
+function parseDatetime(str) {
+  if (!str) return null;
+  const [datePart, timePart] = str.trim().split(' ');
+  if (!datePart) return null;
+  const [d, m, y] = datePart.split('.').map(Number);
+  if (!d || !m || !y) return null;
+  const hour = timePart ? parseInt(timePart.split(':')[0], 10) : 0;
+  return { year: y, month1: m, day: d, hour: isNaN(hour) ? 0 : hour };
+}
+
+// ── Turnos & Horarios (Report 233 — ventas reales con descuentos) ─────────────
 async function fetchVentasHorariosThinkion(empresaId, monthsBack = 24) {
   const cfg = THINKION_CONFIG[empresaId];
   if (!cfg) throw new Error(`Empresa "${empresaId}" no tiene config Thinkion`);
@@ -354,11 +368,13 @@ async function fetchVentasHorariosThinkion(empresaId, monthsBack = 24) {
   const { code, token, establishments } = cfg;
   const chunks = monthChunks(monthsBack);
 
+  // Report 233: una fila = una venta/orden completa
+  // Usa TOTAL (no payment) → incluye descuentos correctamente
   const allRows = [];
   for (const chunk of chunks) {
-    const rows = await fetchChunkCached(empresaId, 294, chunk, () =>
+    const rows = await fetchChunkCached(empresaId, 233, chunk, () =>
       thinkionRequest(code, token, {
-        id_report:      294,
+        id_report:      233,
         date_init:      chunk.date_init,
         date_end:       chunk.date_end,
         establishments,
@@ -368,27 +384,29 @@ async function fetchVentasHorariosThinkion(empresaId, monthsBack = 24) {
     if (!chunk.closed) await sleep(800);
   }
 
-  console.log(`[Thinkion/${empresaId}] Total turnos: ${allRows.length} filas`);
+  console.log(`[Thinkion/${empresaId}] Total turnos (R233): ${allRows.length} ventas`);
 
   const records = [];
   for (const row of allRows) {
-    const parsed = parseDating(row.dating);
+    // date_init: "DD.MM.YYYY HH:MM"
+    const parsed = parseDatetime(row.date_init);
     if (!parsed) continue;
-    const { year, month1, day } = parsed;
-    const hora  = parseInt(row.hour_sale, 10);
-    const venta = parseFloat(row.payment) || 0;
-    const orden = parseInt(row.orders, 10) || 0;
+    const { year, month1, day, hour } = parsed;
 
-    if (isNaN(hora) || hora < 0 || hora > 23) continue;
-    if (!venta && !orden) continue;
+    const venta = parseFloat(row.total) || 0;
+    if (!venta) continue;  // ignorar ventas en $0
 
     const dateObj      = new Date(year, month1 - 1, day);
     const jsDay        = dateObj.getDay();
     const diaSemanaIdx = jsDay === 0 ? 6 : jsDay - 1;
 
+    // sale_turn: N=NOCHE, T=TARDE(DIA), M=MAÑANA(DIA)
+    const turnoMap = { N: 'NOCHE', T: 'DIA', M: 'DIA' };
+    const turno    = turnoMap[row.sale_turn] || 'NOCHE';
+
     records.push({
-      hora,
-      orden,
+      hora:         hour,
+      orden:        1,                      // cada fila = 1 orden
       fecha:        `${year}-${String(month1).padStart(2,'0')}-${String(day).padStart(2,'0')}`,
       año:          year,
       mes:          month1,
@@ -397,7 +415,67 @@ async function fetchVentasHorariosThinkion(empresaId, monthsBack = 24) {
       diaSemana:    DIA_NOMBRES[diaSemanaIdx],
       diaSemanaIdx,
       venta,
-      turno:        (hora >= 7 && hora <= 16) ? 'DIA' : 'NOCHE',
+      turno,
+      turnoOriginal: row.sale_turn  || '',  // N/T/M — para análisis futuro
+      plano:         row.behaviour  || '',  // Zonas/Mostrador
+      tipoTicket:    row.ticket_last || '', // B/A/Despacho
+    });
+  }
+
+  return records;
+}
+
+// ── Movimientos de Stock (Report 283) ─────────────────────────────────────────
+async function fetchMovimientosStock(empresaId, monthsBack = 3) {
+  const cfg = THINKION_CONFIG[empresaId];
+  if (!cfg) throw new Error(`Empresa "${empresaId}" no tiene config Thinkion`);
+
+  const { code, token, establishments } = cfg;
+  const chunks = monthChunks(monthsBack);
+
+  // Stock movements no necesitan tanto historial — 3 meses por defecto
+  // Sí los cacheamos en disco igual (datos que no cambian)
+  const allRows = [];
+  for (const chunk of chunks) {
+    const rows = await fetchChunkCached(empresaId, 283, chunk, () =>
+      thinkionRequest(code, token, {
+        id_report:      283,
+        date_init:      chunk.date_init,
+        date_end:       chunk.date_end,
+        establishments,
+      })
+    );
+    allRows.push(...rows);
+    if (!chunk.closed) await sleep(800);
+  }
+
+  console.log(`[Thinkion/${empresaId}] Total movimientos (R283): ${allRows.length} filas`);
+
+  const records = [];
+  for (const row of allRows) {
+    // dating: "DD.MM.YYYY HH:MM"
+    const parsed = parseDatetime(row.dating);
+    if (!parsed) continue;
+    const { year, month1, day, hour } = parsed;
+
+    const items      = parseInt(row.items, 10)      || 0;
+    const priceList  = parseFloat(row.price_list)   || 0;
+    if (!items) continue;
+
+    records.push({
+      fecha:        `${year}-${String(month1).padStart(2,'0')}-${String(day).padStart(2,'0')}`,
+      hora:         hour,
+      año:          year,
+      mes:          month1,
+      mesNombre:    MES_NOMBRES[month1 - 1] || 'ENERO',
+      producto:     (row.name_product || '').trim(),
+      cantidad:     items,
+      precioLista:  priceList,
+      costoTotal:   Math.round(items * priceList),
+      motivo:       (row.reason || '').trim(),
+      notas:        (row.notes  || '').trim(),
+      usuario:      (row.user   || '').trim(),
+      idVenta:      row.id_sale || null,
     });
   }
 
@@ -442,7 +520,8 @@ async function reporteProductosSinCategoria(empresaId) {
 module.exports = {
   fetchCartaDataThinkion,
   fetchVentasHorariosThinkion,
+  fetchMovimientosStock,
   reporteProductosSinCategoria,
   THINKION_CONFIG,
-  _thinkionRequestRaw: thinkionRequest,  // para el endpoint de preview/diagnóstico
+  _thinkionRequestRaw: thinkionRequest,
 };
