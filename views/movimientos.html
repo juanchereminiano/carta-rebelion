@@ -14,53 +14,108 @@
     .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 10px 20px; color: rgba(255,255,255,.65); text-decoration: none; font-size: .82rem; font-weight: 500; border-left: 3px solid transparent; transition: background .15s; }
     .sidebar-link:hover, .sidebar-link.active { background: rgba(255,255,255,.08); color: #fff; border-left-color: #60a5fa; }
     .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-    .topbar { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+
+    /* Topbar */
+    .topbar { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
     .topbar h1 { font-size: 1rem; font-weight: 700; color: #1e3a6e; }
+    .topbar-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
     .content { padding: 24px 28px; flex: 1; }
 
-    /* KPIs */
-    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
-    .kpi { background: #fff; border-radius: 12px; padding: 18px 20px; border: 1px solid #e2e8f0; }
-    .kpi-label { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin-bottom: 6px; }
-    .kpi-value { font-size: 1.5rem; font-weight: 800; color: #1e293b; }
-    .kpi-sub { font-size: .72rem; color: #94a3b8; margin-top: 2px; }
+    /* Filtros panel */
+    .filters-panel {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      align-items: end;
+    }
+    .filter-group { display: flex; flex-direction: column; gap: 4px; }
+    .filter-label { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; }
+    .sel, .date-input {
+      padding: 8px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: .82rem;
+      background: #fff;
+      cursor: pointer;
+      outline: none;
+      width: 100%;
+      font-family: inherit;
+      color: #1e293b;
+    }
+    .sel:focus, .date-input:focus { border-color: #60a5fa; }
+    .sel.active, .date-input.active { border-color: #2563eb; background: #eff6ff; }
 
-    /* Toolbar */
-    .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-    .search-box { flex: 1; min-width: 200px; max-width: 320px; position: relative; }
-    .search-box input { width: 100%; padding: 8px 12px 8px 32px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: .82rem; background: #fff; outline: none; }
-    .search-box input:focus { border-color: #60a5fa; }
-    .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
-    .sel { padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: .82rem; background: #fff; cursor: pointer; outline: none; }
-    .sel:focus { border-color: #60a5fa; }
-    .badge { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 20px; padding: 4px 12px; font-size: .75rem; font-weight: 700; }
+    .filter-group-search { grid-column: 1 / -1; }
+    .search-wrap { position: relative; }
+    .search-wrap input {
+      width: 100%;
+      padding: 8px 12px 8px 34px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: .82rem;
+      outline: none;
+      font-family: inherit;
+    }
+    .search-wrap input:focus { border-color: #60a5fa; }
+    .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-style: normal; }
+
+    .btn-clear {
+      padding: 8px 16px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #fff;
+      font-size: .78rem;
+      font-weight: 600;
+      color: #64748b;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .15s;
+    }
+    .btn-clear:hover { background: #f1f5f9; }
+
+    /* KPIs */
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .kpi { background: #fff; border-radius: 12px; padding: 16px 20px; border: 1px solid #e2e8f0; }
+    .kpi-label { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin-bottom: 4px; }
+    .kpi-value { font-size: 1.4rem; font-weight: 800; color: #1e293b; }
+    .kpi-sub { font-size: .7rem; color: #94a3b8; margin-top: 2px; }
+
+    /* Cards por motivo */
+    .motivos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-bottom: 20px; }
+    .motivo-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+    .motivo-card:hover { border-color: #93c5fd; box-shadow: 0 2px 8px rgba(37,99,235,.08); }
+    .motivo-card.selected { border-color: #2563eb; background: #eff6ff; }
+    .motivo-card-label { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #64748b; margin-bottom: 4px; }
+    .motivo-card-value { font-size: 1.05rem; font-weight: 800; color: #1e293b; }
+    .motivo-card-items { font-size: .7rem; color: #94a3b8; margin-top: 2px; }
 
     /* Tabla */
+    .table-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .badge { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 20px; padding: 4px 12px; font-size: .75rem; font-weight: 700; }
     .table-wrap { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
     table { width: 100%; border-collapse: collapse; font-size: .82rem; }
     thead { background: #f8fafc; }
-    th { padding: 10px 14px; text-align: left; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #64748b; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+    th { padding: 10px 14px; text-align: left; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #64748b; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
     td { padding: 8px 14px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: #fafafa; }
     .text-right { text-align: right; }
     .text-center { text-align: center; }
-    .tag { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: .7rem; font-weight: 700; }
-    .tag-cp { background: #fee2e2; color: #b91c1c; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: .7rem; font-weight: 700; white-space: nowrap; }
+    .tag-cp     { background: #fee2e2; color: #b91c1c; }
     .tag-evento { background: #fef3c7; color: #92400e; }
-    .tag-otro { background: #f1f5f9; color: #475569; }
+    .tag-otro   { background: #f1f5f9; color: #475569; }
     .product-name { font-weight: 500; }
     .muted { color: #94a3b8; font-size: .75rem; }
     .loading-state, .empty-state { text-align: center; padding: 60px; color: #94a3b8; }
     .spinner { width: 30px; height: 30px; border: 3px solid #e2e8f0; border-top-color: #1e3a6e; border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 12px; }
     @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* Motivos chart */
-    .motivos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 24px; }
-    .motivo-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; }
-    .motivo-card-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #64748b; margin-bottom: 4px; }
-    .motivo-card-value { font-size: 1.1rem; font-weight: 800; color: #1e293b; }
-    .motivo-card-items { font-size: .72rem; color: #94a3b8; margin-top: 2px; }
   </style>
 </head>
 <body>
@@ -78,21 +133,78 @@
   <div class="main">
     <div class="topbar">
       <h1>📤 Movimientos de Stock (precio $0)</h1>
-      <div style="display:flex;gap:10px;align-items:center">
-        <select class="sel" id="months-sel">
+      <div class="topbar-controls">
+        <select class="sel" id="months-sel" style="width:auto">
           <option value="1">Último mes</option>
           <option value="3" selected>Últimos 3 meses</option>
           <option value="6">Últimos 6 meses</option>
           <option value="12">Último año</option>
+          <option value="24">Últimos 2 años</option>
         </select>
       </div>
     </div>
 
     <div class="content">
+
+      <!-- Filtros -->
+      <div class="filters-panel">
+
+        <!-- Búsqueda libre -->
+        <div class="filter-group filter-group-search">
+          <label class="filter-label">Buscar</label>
+          <div class="search-wrap">
+            <i class="search-icon">🔍</i>
+            <input type="text" id="search" placeholder="Producto, motivo, notas, usuario…" />
+          </div>
+        </div>
+
+        <!-- Fecha desde -->
+        <div class="filter-group">
+          <label class="filter-label">Fecha desde</label>
+          <input type="date" class="date-input" id="fecha-desde" />
+        </div>
+
+        <!-- Fecha hasta -->
+        <div class="filter-group">
+          <label class="filter-label">Fecha hasta</label>
+          <input type="date" class="date-input" id="fecha-hasta" />
+        </div>
+
+        <!-- Motivo -->
+        <div class="filter-group">
+          <label class="filter-label">Motivo</label>
+          <select class="sel" id="filter-motivo">
+            <option value="">Todos</option>
+          </select>
+        </div>
+
+        <!-- Usuario -->
+        <div class="filter-group">
+          <label class="filter-label">Usuario</label>
+          <select class="sel" id="filter-user">
+            <option value="">Todos</option>
+          </select>
+        </div>
+
+        <!-- Producto -->
+        <div class="filter-group">
+          <label class="filter-label">Producto</label>
+          <select class="sel" id="filter-producto">
+            <option value="">Todos</option>
+          </select>
+        </div>
+
+        <!-- Limpiar -->
+        <div class="filter-group" style="justify-content:flex-end">
+          <label class="filter-label">&nbsp;</label>
+          <button class="btn-clear" id="btn-clear">✕ Limpiar filtros</button>
+        </div>
+      </div>
+
       <!-- KPIs -->
       <div class="kpis" id="kpis" style="display:none">
         <div class="kpi">
-          <div class="kpi-label">Total movimientos</div>
+          <div class="kpi-label">Movimientos</div>
           <div class="kpi-value" id="kpi-total">—</div>
           <div class="kpi-sub">registros en el período</div>
         </div>
@@ -100,6 +212,10 @@
           <div class="kpi-label">Costo estimado</div>
           <div class="kpi-value" id="kpi-costo">—</div>
           <div class="kpi-sub">a precio de lista</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Unidades</div>
+          <div class="kpi-value" id="kpi-units">—</div>
         </div>
         <div class="kpi">
           <div class="kpi-label">Productos distintos</div>
@@ -111,28 +227,16 @@
         </div>
       </div>
 
-      <!-- Por motivo -->
+      <!-- Cards por motivo (clickeables para filtrar) -->
       <div class="motivos-grid" id="motivos-grid" style="display:none"></div>
 
-      <!-- Toolbar -->
-      <div class="toolbar">
-        <div class="search-box">
-          <span class="search-icon">🔍</span>
-          <input type="text" id="search" placeholder="Buscar producto o motivo…" />
-        </div>
-        <select class="sel" id="filter-motivo">
-          <option value="">Motivo: Todos</option>
-        </select>
-        <select class="sel" id="filter-user">
-          <option value="">Usuario: Todos</option>
-        </select>
+      <!-- Tabla -->
+      <div class="table-header">
         <span class="badge" id="count-badge">0 registros</span>
       </div>
-
-      <!-- Tabla -->
       <div class="table-wrap">
         <div class="loading-state" id="loading"><div class="spinner"></div>Cargando…</div>
-        <div class="empty-state" id="empty" style="display:none">Sin movimientos en el período.</div>
+        <div class="empty-state" id="empty" style="display:none">Sin movimientos con los filtros actuales.</div>
         <table id="table" style="display:none">
           <thead>
             <tr>
@@ -154,102 +258,160 @@
 </div>
 
 <script>
-  let allRecords = [];
+  let allRecords    = [];
+  let activeMotivoCard = null; // motivo seleccionado via card
 
+  // ── Carga desde API ───────────────────────────────────────────────────────
   async function load() {
     const months = document.getElementById('months-sel').value;
     document.getElementById('loading').style.display = 'block';
-    document.getElementById('table').style.display = 'none';
-    document.getElementById('empty').style.display = 'none';
-    document.getElementById('kpis').style.display = 'none';
+    document.getElementById('table').style.display   = 'none';
+    document.getElementById('empty').style.display   = 'none';
+    document.getElementById('kpis').style.display    = 'none';
     document.getElementById('motivos-grid').style.display = 'none';
+    activeMotivoCard = null;
 
     try {
       const data = await fetch(`/api/movimientos?months=${months}`).then(r => r.json());
       if (!data.ok) throw new Error(data.error);
       allRecords = data.records || [];
-      buildFilters();
+      buildDropdowns();
       render();
     } catch (err) {
       document.getElementById('loading').innerHTML = `<p style="color:#dc2626">Error: ${err.message}</p>`;
     }
   }
 
-  function buildFilters() {
-    const motivos = [...new Set(allRecords.map(r => r.motivo).filter(Boolean))].sort();
-    const users   = [...new Set(allRecords.map(r => r.usuario).filter(Boolean))].sort();
+  // ── Poblar dropdowns con valores únicos ───────────────────────────────────
+  function buildDropdowns() {
+    const motivos   = [...new Set(allRecords.map(r => r.motivo).filter(Boolean))].sort();
+    const users     = [...new Set(allRecords.map(r => r.usuario).filter(Boolean))].sort();
+    const productos = [...new Set(allRecords.map(r => r.producto).filter(Boolean))].sort();
 
-    const mSel = document.getElementById('filter-motivo');
-    mSel.innerHTML = '<option value="">Motivo: Todos</option>';
-    motivos.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; mSel.appendChild(o); });
-
-    const uSel = document.getElementById('filter-user');
-    uSel.innerHTML = '<option value="">Usuario: Todos</option>';
-    users.forEach(u => { const o = document.createElement('option'); o.value = u; o.textContent = u; uSel.appendChild(o); });
+    fill('filter-motivo',   motivos,   'Todos');
+    fill('filter-user',     users,     'Todos');
+    fill('filter-producto', productos, 'Todos');
   }
 
+  function fill(id, values, placeholder) {
+    const sel = document.getElementById(id);
+    const cur = sel.value;
+    sel.innerHTML = `<option value="">${placeholder}</option>`;
+    values.forEach(v => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = v;
+      if (v === cur) o.selected = true;
+      sel.appendChild(o);
+    });
+  }
+
+  // ── Filtrado ──────────────────────────────────────────────────────────────
   function getFiltered() {
-    const q = document.getElementById('search').value.trim().toLowerCase();
-    const m = document.getElementById('filter-motivo').value;
-    const u = document.getElementById('filter-user').value;
+    const q       = document.getElementById('search').value.trim().toLowerCase();
+    const motivo  = activeMotivoCard || document.getElementById('filter-motivo').value;
+    const user    = document.getElementById('filter-user').value;
+    const prod    = document.getElementById('filter-producto').value;
+    const desde   = document.getElementById('fecha-desde').value;  // YYYY-MM-DD
+    const hasta   = document.getElementById('fecha-hasta').value;
+
+    // Marcar inputs activos visualmente
+    ['fecha-desde','fecha-hasta'].forEach(id => {
+      document.getElementById(id).classList.toggle('active', !!document.getElementById(id).value);
+    });
+    ['filter-motivo','filter-user','filter-producto'].forEach(id => {
+      document.getElementById(id).classList.toggle('active', !!document.getElementById(id).value);
+    });
+
     return allRecords.filter(r => {
-      if (q && !`${r.producto} ${r.motivo} ${r.notas}`.toLowerCase().includes(q)) return false;
-      if (m && r.motivo !== m) return false;
-      if (u && r.usuario !== u) return false;
+      if (q      && !`${r.producto} ${r.motivo} ${r.notas} ${r.usuario}`.toLowerCase().includes(q)) return false;
+      if (motivo && r.motivo   !== motivo) return false;
+      if (user   && r.usuario  !== user)   return false;
+      if (prod   && r.producto !== prod)   return false;
+      if (desde  && r.fecha    <  desde)   return false;
+      if (hasta  && r.fecha    >  hasta)   return false;
       return true;
     });
   }
 
+  // ── Render ────────────────────────────────────────────────────────────────
   function render() {
     const filtered = getFiltered();
     document.getElementById('loading').style.display = 'none';
-    document.getElementById('count-badge').textContent = `${filtered.length} registros`;
+    document.getElementById('count-badge').textContent = `${filtered.length} registro${filtered.length !== 1 ? 's' : ''}`;
 
     // KPIs
     const totalCosto = filtered.reduce((s, r) => s + r.costoTotal, 0);
+    const totalUnits = filtered.reduce((s, r) => s + r.cantidad,   0);
     const prods      = new Set(filtered.map(r => r.producto)).size;
     const users      = new Set(filtered.map(r => r.usuario)).size;
     document.getElementById('kpi-total').textContent = filtered.length.toLocaleString('es-AR');
     document.getElementById('kpi-costo').textContent = '$' + fmt(totalCosto);
+    document.getElementById('kpi-units').textContent = totalUnits.toLocaleString('es-AR');
     document.getElementById('kpi-prods').textContent = prods;
     document.getElementById('kpi-users').textContent = users;
     document.getElementById('kpis').style.display = 'grid';
 
-    // Por motivo
+    // Cards por motivo (sobre allRecords, sin filtro de motivo, para poder clicar)
+    const baseForCards = allRecords.filter(r => {
+      const q     = document.getElementById('search').value.trim().toLowerCase();
+      const user  = document.getElementById('filter-user').value;
+      const prod  = document.getElementById('filter-producto').value;
+      const desde = document.getElementById('fecha-desde').value;
+      const hasta = document.getElementById('fecha-hasta').value;
+      if (q    && !`${r.producto} ${r.motivo} ${r.notas} ${r.usuario}`.toLowerCase().includes(q)) return false;
+      if (user && r.usuario  !== user) return false;
+      if (prod && r.producto !== prod) return false;
+      if (desde && r.fecha < desde)   return false;
+      if (hasta && r.fecha > hasta)   return false;
+      return true;
+    });
+
     const byMotivo = {};
-    filtered.forEach(r => {
+    baseForCards.forEach(r => {
       const k = r.motivo || 'Sin motivo';
       if (!byMotivo[k]) byMotivo[k] = { costo: 0, items: 0 };
       byMotivo[k].costo += r.costoTotal;
       byMotivo[k].items += r.cantidad;
     });
+
     const motivosGrid = document.getElementById('motivos-grid');
     motivosGrid.innerHTML = Object.entries(byMotivo)
       .sort((a, b) => b[1].costo - a[1].costo)
       .map(([k, v]) => `
-        <div class="motivo-card">
+        <div class="motivo-card ${activeMotivoCard === k ? 'selected' : ''}" data-motivo="${esc(k)}">
           <div class="motivo-card-label">${esc(k)}</div>
           <div class="motivo-card-value">$${fmt(v.costo)}</div>
           <div class="motivo-card-items">${v.items} unidades</div>
         </div>`).join('');
     motivosGrid.style.display = 'grid';
 
+    // Click en card → filtra por ese motivo (toggle)
+    motivosGrid.querySelectorAll('.motivo-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const m = card.dataset.motivo;
+        activeMotivoCard = activeMotivoCard === m ? null : m;
+        // Sincronizar select
+        document.getElementById('filter-motivo').value = activeMotivoCard || '';
+        render();
+      });
+    });
+
+    // Tabla
     if (!filtered.length) {
       document.getElementById('table').style.display = 'none';
       document.getElementById('empty').style.display = 'block';
       return;
     }
     document.getElementById('empty').style.display = 'none';
-    document.getElementById('table').style.display = 'table';
+    document.getElementById('table').style.display  = 'table';
 
-    // Ordenar por fecha desc
     const sorted = [...filtered].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.hora - a.hora);
 
     document.getElementById('tbody').innerHTML = sorted.map(r => {
       const tagClass = /personal/i.test(r.motivo) ? 'tag-cp' : /banda|dj|evento/i.test(r.motivo) ? 'tag-evento' : 'tag-otro';
       return `
         <tr>
-          <td><span>${r.fecha}</span><br><span class="muted">${String(r.hora).padStart(2,'0')}:00</span></td>
+          <td><span style="font-weight:500">${r.fecha}</span><br><span class="muted">${String(r.hora).padStart(2,'0')}:00 hs</span></td>
           <td class="product-name">${esc(r.producto)}</td>
           <td class="text-center">${r.cantidad}</td>
           <td class="text-right muted">$${r.precioLista.toLocaleString('es-AR')}</td>
@@ -261,23 +423,41 @@
     }).join('');
   }
 
+  // ── Limpiar todos los filtros ─────────────────────────────────────────────
+  document.getElementById('btn-clear').addEventListener('click', () => {
+    document.getElementById('search').value        = '';
+    document.getElementById('fecha-desde').value  = '';
+    document.getElementById('fecha-hasta').value  = '';
+    document.getElementById('filter-motivo').value   = '';
+    document.getElementById('filter-user').value     = '';
+    document.getElementById('filter-producto').value = '';
+    activeMotivoCard = null;
+    ['fecha-desde','fecha-hasta','filter-motivo','filter-user','filter-producto'].forEach(id =>
+      document.getElementById(id).classList.remove('active')
+    );
+    render();
+  });
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
   function fmt(n) {
     if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
     if (n >= 1e3) return Math.round(n / 1e3) + 'K';
     return n.toLocaleString('es-AR');
   }
   function esc(s) {
-    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  // Empresa en sidebar
+  // ── Empresa en sidebar ────────────────────────────────────────────────────
   fetch('/api/empresa/current').then(r => r.json()).then(e => {
     if (e.nombre) document.getElementById('sidebar-empresa').textContent = e.nombre;
   });
 
+  // ── Eventos ───────────────────────────────────────────────────────────────
   document.getElementById('months-sel').addEventListener('change', load);
-  ['search','filter-motivo','filter-user'].forEach(id => {
+  ['search','filter-motivo','filter-user','filter-producto','fecha-desde','fecha-hasta'].forEach(id => {
     document.getElementById(id).addEventListener('input', render);
+    document.getElementById(id).addEventListener('change', render);
   });
 
   load();
