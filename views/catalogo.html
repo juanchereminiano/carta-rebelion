@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Catálogo de Productos</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: #f5f5f0;
+      color: #1e293b;
+      min-height: 100vh;
+    }
+
+    /* ── Layout ── */
+    .layout { display: flex; min-height: 100vh; }
+
+    .sidebar {
+      width: 220px;
+      background: #1e3a6e;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 0;
+      flex-shrink: 0;
+    }
+    .sidebar-logo {
+      padding: 0 20px 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      font-size: .75rem;
+      opacity: .6;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    .sidebar-nav { padding: 16px 0; flex: 1; }
+    .sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px;
+      color: rgba(255,255,255,.65);
+      text-decoration: none;
+      font-size: .82rem;
+      font-weight: 500;
+      border-left: 3px solid transparent;
+      transition: background .15s, color .15s;
+    }
+    .sidebar-link:hover, .sidebar-link.active {
+      background: rgba(255,255,255,.08);
+      color: #fff;
+      border-left-color: #60a5fa;
+    }
+
+    /* ── Main ── */
+    .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+    .topbar {
+      background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .topbar h1 { font-size: 1rem; font-weight: 700; color: #1e3a6e; }
+
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+
+    .content { padding: 24px 28px; flex: 1; }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .search-box {
+      flex: 1;
+      min-width: 200px;
+      max-width: 340px;
+      position: relative;
+    }
+    .search-box input {
+      width: 100%;
+      padding: 8px 12px 8px 34px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: .85rem;
+      background: #fff;
+      outline: none;
+    }
+    .search-box input:focus { border-color: #60a5fa; }
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #94a3b8;
+      font-size: .9rem;
+    }
+
+    .filter-select {
+      padding: 8px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: .82rem;
+      background: #fff;
+      cursor: pointer;
+      outline: none;
+    }
+    .filter-select:focus { border-color: #60a5fa; }
+
+    .badge-count {
+      background: #eff6ff;
+      color: #2563eb;
+      border: 1px solid #bfdbfe;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: .75rem;
+      font-weight: 700;
+    }
+
+    .btn {
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: .82rem;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: opacity .15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn:hover { opacity: .85; }
+    .btn-primary { background: #1e3a6e; color: #fff; }
+    .btn-success { background: #059669; color: #fff; }
+    .btn-sm { padding: 5px 12px; font-size: .75rem; }
+    .btn:disabled { opacity: .4; cursor: default; }
+
+    /* ── Tabla ── */
+    .table-wrap {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      overflow: hidden;
+    }
+
+    table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    thead { background: #f8fafc; }
+    th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: .7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #64748b;
+      border-bottom: 1px solid #e2e8f0;
+      white-space: nowrap;
+    }
+    td {
+      padding: 8px 14px;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr.edited td:first-child { border-left: 3px solid #059669; }
+    tr:hover td { background: #fafafa; }
+
+    .col-id      { width: 70px; color: #94a3b8; font-size: .75rem; }
+    .col-original{ max-width: 200px; }
+    .col-informe { min-width: 180px; }
+    .col-cat     { min-width: 150px; }
+    .col-mix     { width: 130px; }
+    .col-ventas  { width: 110px; text-align: right; }
+    .col-meses   { width: 70px; text-align: center; color: #94a3b8; }
+    .col-status  { width: 40px; text-align: center; }
+
+    .nombre-orig {
+      color: #374151;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 200px;
+      display: block;
+    }
+
+    .inline-input {
+      width: 100%;
+      padding: 5px 8px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      font-size: .82rem;
+      background: transparent;
+      font-family: inherit;
+      color: #1e293b;
+      transition: border-color .15s, background .15s;
+    }
+    .inline-input:hover { background: #f1f5f9; border-color: #e2e8f0; }
+    .inline-input:focus { background: #fff; border-color: #60a5fa; outline: none; }
+    .inline-input.dirty { background: #fffbeb; border-color: #fbbf24; }
+
+    select.inline-input { cursor: pointer; }
+
+    .ventas-fmt { font-weight: 600; color: #1e293b; }
+    .ventas-small { font-size: .7rem; color: #94a3b8; }
+
+    .icon-edited { color: #059669; font-size: .85rem; }
+    .icon-pending { color: #f59e0b; font-size: .85rem; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: .85rem;
+      font-weight: 600;
+      color: #fff;
+      z-index: 9999;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity .25s, transform .25s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: none; }
+    .toast.ok  { background: #059669; }
+    .toast.err { background: #dc2626; }
+
+    /* ── Loading ── */
+    .loading-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #94a3b8;
+    }
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid #e2e8f0;
+      border-top-color: #1e3a6e;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #94a3b8;
+    }
+
+    /* ── Pending indicator ── */
+    .pending-bar {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      font-size: .8rem;
+      color: #92400e;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+      padding: 6px 14px;
+    }
+    .pending-bar.show { display: flex; }
+  </style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo" id="sidebar-empresa">—</div>
+    <nav class="sidebar-nav">
+      <a class="sidebar-link" href="/">📊 Dashboard Carta</a>
+      <a class="sidebar-link" href="/catalogo" class="active">📦 Catálogo</a>
+      <a class="sidebar-link" href="/empresa">⇄ Cambiar empresa</a>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <h1>📦 Catálogo de Productos</h1>
+      <div class="topbar-right">
+        <div class="pending-bar" id="pending-bar">
+          ⚠️ <span id="pending-count">0</span> cambio(s) sin guardar
+        </div>
+        <button class="btn btn-success" id="btn-save" disabled>💾 Guardar cambios</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="search" placeholder="Buscar producto…" />
+        </div>
+        <select class="filter-select" id="filter-mix">
+          <option value="">Mix: Todos</option>
+          <option value="Comida">Comida</option>
+          <option value="Bebida">Bebida</option>
+          <option value="Promos">Promos</option>
+          <option value="Mercado">Mercado</option>
+          <option value="Evento">Evento</option>
+          <option value="__sin__">Sin asignar</option>
+        </select>
+        <select class="filter-select" id="filter-cat">
+          <option value="">Categoría: Todas</option>
+        </select>
+        <span class="badge-count" id="count-badge">0 productos</span>
+      </div>
+
+      <!-- Tabla -->
+      <div class="table-wrap">
+        <div class="loading-state" id="loading">
+          <div class="spinner"></div>
+          Cargando catálogo…
+        </div>
+        <div class="empty-state" id="empty" style="display:none">
+          No hay productos que coincidan con el filtro.
+        </div>
+        <table id="table" style="display:none">
+          <thead>
+            <tr>
+              <th class="col-id">ID</th>
+              <th class="col-original">Nombre en Thinkion</th>
+              <th class="col-informe">Nombre de Informe ✏️</th>
+              <th class="col-cat">Categoría ✏️</th>
+              <th class="col-mix">Mix ✏️</th>
+              <th class="col-ventas">Ventas</th>
+              <th class="col-meses">Meses</th>
+              <th class="col-status"></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── Estado ────────────────────────────────────────────────────────────────
+  let allProducts = [];
+  let pending     = {};  // id → { ...campos editados }
+
+  const MIX_OPTIONS = ['', 'Comida', 'Bebida', 'Promos', 'Mercado', 'Evento'];
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  async function init() {
+    // Nombre empresa en sidebar
+    const emp = await fetch('/api/empresa/current').then(r => r.json()).catch(() => ({}));
+    if (emp.nombre) document.getElementById('sidebar-empresa').textContent = emp.nombre;
+
+    // Cargar catálogo
+    try {
+      const data = await fetch('/api/catalogo').then(r => r.json());
+      allProducts = data.productos || [];
+      buildCategoryFilter();
+      renderTable();
+    } catch (err) {
+      document.getElementById('loading').innerHTML =
+        `<p style="color:#dc2626">Error al cargar: ${err.message}</p>`;
+    }
+  }
+
+  // ── Filtros ───────────────────────────────────────────────────────────────
+  function buildCategoryFilter() {
+    const cats = [...new Set(allProducts.map(p => p.categoria).filter(Boolean))].sort();
+    const sel  = document.getElementById('filter-cat');
+    cats.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c; o.textContent = c;
+      sel.appendChild(o);
+    });
+  }
+
+  function getFiltered() {
+    const q   = document.getElementById('search').value.trim().toLowerCase();
+    const mix = document.getElementById('filter-mix').value;
+    const cat = document.getElementById('filter-cat').value;
+
+    return allProducts.filter(p => {
+      if (q) {
+        const hay = `${p.nombreOriginal} ${p.nombreInforme} ${p.id}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      if (mix) {
+        if (mix === '__sin__' && p.mix) return false;
+        if (mix !== '__sin__' && p.mix !== mix) return false;
+      }
+      if (cat && p.categoria !== cat) return false;
+      return true;
+    });
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  function renderTable() {
+    const filtered = getFiltered();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('count-badge').textContent = `${filtered.length} producto${filtered.length !== 1 ? 's' : ''}`;
+
+    if (!filtered.length) {
+      document.getElementById('table').style.display = 'none';
+      document.getElementById('empty').style.display = 'block';
+      return;
+    }
+    document.getElementById('empty').style.display = 'none';
+    document.getElementById('table').style.display = 'table';
+
+    const tbody = document.getElementById('tbody');
+    tbody.innerHTML = filtered.map(p => {
+      const pend    = pending[p.id] || {};
+      const informe = pend.nombreInforme !== undefined ? pend.nombreInforme : p.nombreInforme;
+      const cat     = pend.categoria     !== undefined ? pend.categoria     : p.categoria;
+      const mix     = pend.mix           !== undefined ? pend.mix           : p.mix;
+      const hasPend = pend.nombreInforme !== undefined || pend.categoria !== undefined || pend.mix !== undefined;
+
+      return `
+        <tr class="${p.editado || hasPend ? 'edited' : ''}" data-id="${esc(p.id)}">
+          <td class="col-id">${esc(p.id)}</td>
+          <td class="col-original"><span class="nombre-orig" title="${esc(p.nombreOriginal)}">${esc(p.nombreOriginal)}</span></td>
+          <td class="col-informe">
+            <input class="inline-input ${pend.nombreInforme !== undefined ? 'dirty' : ''}"
+                   data-field="nombreInforme"
+                   value="${esc(informe)}"
+                   title="Nombre de informe (para agrupar productos renombrados)" />
+          </td>
+          <td class="col-cat">
+            <input class="inline-input ${pend.categoria !== undefined ? 'dirty' : ''}"
+                   data-field="categoria"
+                   value="${esc(cat)}"
+                   list="cat-list"
+                   placeholder="Ej: CERVEZAS" />
+          </td>
+          <td class="col-mix">
+            <select class="inline-input ${pend.mix !== undefined ? 'dirty' : ''}"
+                    data-field="mix">
+              ${MIX_OPTIONS.map(o => `<option value="${o}" ${mix === o ? 'selected' : ''}>${o || '— sin mix —'}</option>`).join('')}
+            </select>
+          </td>
+          <td class="col-ventas">
+            <span class="ventas-fmt">$${fmt(p.totalVentas)}</span>
+          </td>
+          <td class="col-meses">${p.meses}</td>
+          <td class="col-status">
+            ${hasPend  ? '<span class="icon-pending" title="Cambios sin guardar">●</span>' :
+              p.editado ? '<span class="icon-edited"  title="Editado">✓</span>' : ''}
+          </td>
+        </tr>`;
+    }).join('');
+
+    // Datalist de categorías
+    if (!document.getElementById('cat-list')) {
+      const dl = document.createElement('datalist');
+      dl.id = 'cat-list';
+      const cats = [...new Set(allProducts.map(p => p.categoria).filter(Boolean))].sort();
+      cats.forEach(c => { const o = document.createElement('option'); o.value = c; dl.appendChild(o); });
+      document.body.appendChild(dl);
+    }
+
+    // Eventos de edición
+    tbody.querySelectorAll('.inline-input').forEach(input => {
+      input.addEventListener('change', onFieldChange);
+    });
+  }
+
+  // ── Edición inline ────────────────────────────────────────────────────────
+  function onFieldChange(e) {
+    const row   = e.target.closest('tr');
+    const id    = row.dataset.id;
+    const field = e.target.dataset.field;
+    const val   = e.target.value;
+
+    // Buscar valor original
+    const original = allProducts.find(p => p.id === id);
+    const origVal  = original ? original[field] : '';
+
+    if (val === origVal) {
+      // Revertido al original → quitar de pending
+      if (pending[id]) {
+        delete pending[id][field];
+        if (!Object.keys(pending[id]).length) delete pending[id];
+      }
+      e.target.classList.remove('dirty');
+    } else {
+      if (!pending[id]) pending[id] = {};
+      pending[id][field] = val;
+      e.target.classList.add('dirty');
+    }
+
+    updatePendingUI();
+  }
+
+  function updatePendingUI() {
+    const count = Object.keys(pending).length;
+    const bar   = document.getElementById('pending-bar');
+    const btn   = document.getElementById('btn-save');
+    document.getElementById('pending-count').textContent = count;
+    bar.classList.toggle('show', count > 0);
+    btn.disabled = count === 0;
+  }
+
+  // ── Guardar ───────────────────────────────────────────────────────────────
+  document.getElementById('btn-save').addEventListener('click', async () => {
+    const updates = Object.entries(pending).map(([id, fields]) => ({ id, ...fields }));
+    if (!updates.length) return;
+
+    document.getElementById('btn-save').disabled = true;
+    try {
+      const res = await fetch('/api/catalogo', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ updates }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+
+      // Aplicar cambios en memoria
+      updates.forEach(u => {
+        const p = allProducts.find(x => x.id === u.id);
+        if (!p) return;
+        if (u.nombreInforme !== undefined) p.nombreInforme = u.nombreInforme;
+        if (u.categoria     !== undefined) p.categoria     = u.categoria;
+        if (u.mix           !== undefined) p.mix           = u.mix;
+        p.editado = true;
+      });
+
+      pending = {};
+      updatePendingUI();
+      renderTable();
+      showToast('Cambios guardados ✓', 'ok');
+    } catch (err) {
+      showToast('Error: ' + err.message, 'err');
+      document.getElementById('btn-save').disabled = false;
+    }
+  });
+
+  // ── Filtros reactivos ─────────────────────────────────────────────────────
+  ['search', 'filter-mix', 'filter-cat'].forEach(id => {
+    document.getElementById(id).addEventListener('input', renderTable);
+  });
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function fmt(n) {
+    if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return (n/1e3).toFixed(0) + 'K';
+    return String(n);
+  }
+
+  function showToast(msg, type) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `toast ${type} show`;
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  init();
+</script>
+</body>
+</html>

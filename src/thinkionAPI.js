@@ -14,9 +14,10 @@
  *   294 → hora × día × órdenes (turnos & horarios)
  */
 
-const https = require('https');
-const fs    = require('fs');
-const path  = require('path');
+const https          = require('https');
+const fs             = require('fs');
+const path           = require('path');
+const { readCatalog } = require('./productCatalog');
 
 // ── Constantes de fechas ──────────────────────────────────────────────────────
 const MES_NOMBRES = [
@@ -262,8 +263,9 @@ async function fetchCartaDataThinkion(empresaId, monthsBack = 24) {
   const { code, token, establishments } = cfg;
   const chunks = monthChunks(monthsBack);
 
-  // ── Categorías manuales (prioridad máxima) ────────────────────────────────
-  const manualCats = loadManualCategories(empresaId);
+  // ── Catálogo maestro de productos (prioridad máxima) ─────────────────────
+  const catalog    = readCatalog(empresaId);
+  const manualCats = loadManualCategories(empresaId); // legacy fallback
 
   // ── Lookup de categorías desde Thinkion (Report 353, solo mes actual) ─────
   const currentChunk = chunks.find(c => !c.closed) || chunks[0];
@@ -307,25 +309,33 @@ async function fetchCartaDataThinkion(empresaId, monthsBack = 24) {
     const dinero = parseFloat(row.sale)  || 0;
     if (!row.product || (!cant && !dinero)) continue;
 
-    const idStr  = String(row.id_product || '');
-    const nombre = (row.product || '').trim().toUpperCase();
+    const idStr       = String(row.id_product || '');
+    const nombreRaw   = (row.product || '').trim();
+    const nombreUpper = nombreRaw.toUpperCase();
+    const catEntry    = catalog[idStr] || {};
 
+    // Prioridad: catálogo maestro → categorías manuales legacy → Thinkion
     const categoria =
-      manualCats[idStr]  ||
-      manualCats[nombre] ||
+      catEntry.categoria     ||
+      manualCats[idStr]      ||
+      manualCats[nombreUpper]||
       thinkionCatById[idStr] ||
       '';
+
+    // nombreInforme normaliza productos renombrados a lo largo del tiempo
+    const producto = catEntry.nombreInforme || nombreRaw;
+    const mix      = catEntry.mix || '';
 
     records.push({
       ano:            year,
       mes:            MES_NOMBRES[month1 - 1] || 'ENERO',
       categoria,
       codigo:         row.id_product ? parseInt(row.id_product) : null,
-      producto:       row.product,
+      producto,
       cant,
       dinero,
       precioPromedio: parseFloat(row.avg_price) || null,
-      mix:            '',
+      mix,
     });
   }
 

@@ -28,6 +28,7 @@ const {
   reporteProductosSinCategoria,
   THINKION_CONFIG,
 } = require('./src/thinkionAPI');
+const { readCatalog, updateProducts, buildProductList } = require('./src/productCatalog');
 const {
   filterVentas,
   buildHourlyStats,
@@ -486,6 +487,39 @@ app.get('/api/thinkion/diagnostico', requireAdmin, (req, res) => {
   }
 });
 
+// ── Catálogo de Productos ─────────────────────────────────────────────────────
+
+// Lista de productos únicos con sus datos editables
+app.get('/api/catalogo', (req, res) => {
+  try {
+    const empresaId = req.session?.empresa;
+    if (!empresaId) return res.status(400).json({ error: 'Sin empresa seleccionada' });
+    const productos = buildProductList(empresaId);
+    res.json({ ok: true, empresa: empresaId, total: productos.length, productos });
+  } catch (err) {
+    console.error('Error /api/catalogo:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Guardar cambios en uno o varios productos
+app.post('/api/catalogo', (req, res) => {
+  try {
+    const empresaId = req.session?.empresa;
+    if (!empresaId) return res.status(400).json({ error: 'Sin empresa seleccionada' });
+    const { updates } = req.body;
+    if (!Array.isArray(updates) || !updates.length)
+      return res.status(400).json({ error: 'Se esperan updates[]' });
+    updateProducts(empresaId, updates);
+    // Limpiar caché del dashboard para que tome los nuevos nombres/categorías
+    cache.del(`carta_${empresaId}`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error POST /api/catalogo:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Reporte de productos sin categoría (solo empresas Thinkion, solo admin)
 app.get('/api/categorias/reporte', requireAdmin, async (req, res) => {
   try {
@@ -525,6 +559,11 @@ app.post('/api/refresh', (req, res) => {
   }
   ipcCache.flushAll();     // IPC siempre se limpia (es global)
   res.json({ ok: true });
+});
+
+// Página catálogo de productos
+app.get('/catalogo', (req, res) => {
+  res.sendFile(path.join(__dirname, 'views', 'catalogo.html'));
 });
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
