@@ -44,9 +44,12 @@ const {
 const auth = require('./src/auth');
 
 const app        = express();
-const cache      = new NodeCache({ stdTTL: parseInt(process.env.CACHE_TTL) || 600 });
+// TTL por defecto: 4 horas. El warmup + refresh proactivo garantizan que NodeCache
+// siempre tenga datos sin que el usuario espere la carga desde disco.
+const CACHE_TTL  = parseInt(process.env.CACHE_TTL) || 4 * 3600;
+const cache      = new NodeCache({ stdTTL: CACHE_TTL });
 const ipcCache   = new NodeCache({ stdTTL: 12 * 3600 }); // IPC INDEC: cache 12 h
-const turnosCache = new NodeCache({ stdTTL: parseInt(process.env.CACHE_TTL) || 600 });
+const turnosCache = new NodeCache({ stdTTL: CACHE_TTL });
 
 // ── Configuración de proxy (Railway usa HTTPS terminado en proxy) ────────────
 app.set('trust proxy', 1);
@@ -660,14 +663,20 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 // Warmup: solo rellena el cache en DISCO (sin tocar el NodeCache de memoria).
 // Así evitamos pisar datos ya cargados con catálogo actualizado.
 // Los requests normales llenan el NodeCache a demanda y siempre leen el catálogo fresh.
+/**
+ * warmupCaches: carga datos al arrancar.
+ * Usa getData() / getTurnosData() para llenar tanto disco como NodeCache.
+ * Así la primera consulta de cualquier usuario ya responde desde memoria.
+ */
 async function warmupCaches() {
   const empresas = [...THINKION_EMPRESAS];
-  console.log(`[Warmup] Iniciando pre-carga de disco para: ${empresas.join(', ')}`);
+  console.log(`[Warmup] Pre-carga memoria+disco para: ${empresas.join(', ')}`);
+  const t0 = Date.now();
 
   for (const empresaId of empresas) {
     try {
       console.log(`[Warmup] Carta ${empresaId}…`);
-      await fetchCartaDataThinkion(empresaId);
+      await getData(empresaId);          // ← llena NodeCache "carta_X"
       console.log(`[Warmup] Carta ${empresaId} OK`);
     } catch (err) {
       console.warn(`[Warmup] Error carta ${empresaId}:`, err.message);
@@ -675,19 +684,49 @@ async function warmupCaches() {
 
     try {
       console.log(`[Warmup] Turnos ${empresaId}…`);
-      await fetchVentasHorariosThinkion(empresaId);
+      await getTurnosData(empresaId);    // ← llena NodeCache "turnos_X"
       console.log(`[Warmup] Turnos ${empresaId} OK`);
     } catch (err) {
       console.warn(`[Warmup] Error turnos ${empresaId}:`, err.message);
     }
   }
 
-  console.log('[Warmup] Pre-carga de disco completa.');
+  console.log(`[Warmup] Completo en ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+}
+
+/**
+ * refreshCaches: re-carga datos en background sin esperar al TTL.
+ * Invalida NodeCache primero para forzar re-lectura desde disco (o API si
+ * el mes actual cambió). El usuario que llega mientras se refresca sigue
+ * viendo datos nuevos porque el refresh termina antes de que expire el TTL.
+ */
+async function refreshCaches() {
+  const empresas = [...THINKION_EMPRESAS];
+  console.log('[Refresh] Actualizando caché en background…');
+  for (const empresaId of empresas) {
+    try {
+      cache.del(`carta_${empresaId}`);
+      turnosCache.del(`turnos_${empresaId}`);
+      await getData(empresaId);
+      await getTurnosData(empresaId);
+      console.log(`[Refresh] ${empresaId} OK`);
+    } catch (err) {
+      console.warn(`[Refresh] Error ${empresaId}:`, err.message);
+    }
+  }
+  console.log('[Refresh] Completo.');
 }
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Carta Rebelión corriendo en http://localhost:${PORT}`);
-  // Lanzar warmup en background, sin bloquear el servidor
+
+  // 1. Warmup al arrancar: llena memoria + disco
   warmupCaches().catch(err => console.error('[Warmup] Error general:', err.message));
+
+  // 2. Refresh proactivo cada 3 horas (antes de que venza el TTL de 4h)
+  const REFRESH_INTERVAL = (parseInt(process.env.REFRESH_INTERVAL_H) || 3) * 3600 * 1000;
+  setInterval(() => {
+    refreshCaches().catch(err => console.error('[Refresh] Error:', err.message));
+  }, REFRESH_INTERVAL);
 });
