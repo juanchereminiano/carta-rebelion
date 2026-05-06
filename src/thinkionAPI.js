@@ -212,13 +212,17 @@ async function thinkionRequest(code, token, payload, retries = 5) {
  * - Si el chunk está cerrado y NO está en disco → llama a Thinkion, guarda en disco
  * - Si el chunk es el mes actual → siempre llama a Thinkion (datos del día)
  */
+/**
+ * Devuelve { rows, fromApi } donde fromApi=true significa que se consultó Thinkion.
+ * Cuando fromApi=false el dato vino del disco local (sin costo de rate limit).
+ */
 async function fetchChunkCached(empresaId, report, chunk, fetcher) {
   if (chunk.closed) {
     const file   = cacheFile(empresaId, report, chunk.yearMonth);
     const cached = readCache(file);
     if (cached !== null) {
       console.log(`[Thinkion/${empresaId}] R${report} ${chunk.yearMonth}: cache local (${cached.length} filas)`);
-      return cached;
+      return { rows: cached, fromApi: false };
     }
   }
 
@@ -228,7 +232,7 @@ async function fetchChunkCached(empresaId, report, chunk, fetcher) {
     rows = await fetcher();
   } catch (err) {
     console.error(`[Thinkion/${empresaId}] R${report} ${chunk.yearMonth}: error — ${err.message}`);
-    return [];
+    return { rows: [], fromApi: true };
   }
 
   const label = chunk.closed ? 'nuevo→guardado' : 'mes actual';
@@ -239,7 +243,7 @@ async function fetchChunkCached(empresaId, report, chunk, fetcher) {
     writeCache(cacheFile(empresaId, report, chunk.yearMonth), rows);
   }
 
-  return rows;
+  return { rows, fromApi: true };
 }
 
 // ── Categorías manuales ───────────────────────────────────────────────────────
@@ -256,7 +260,7 @@ function loadManualCategories(empresaId) {
 }
 
 // ── Carta data ────────────────────────────────────────────────────────────────
-async function fetchCartaDataThinkion(empresaId, monthsBack = 24) {
+async function fetchCartaDataThinkion(empresaId, monthsBack = parseInt(process.env.THINKION_MONTHS_BACK) || 60) {
   const cfg = THINKION_CONFIG[empresaId];
   if (!cfg) throw new Error(`Empresa "${empresaId}" no tiene config Thinkion`);
 
@@ -283,7 +287,7 @@ async function fetchCartaDataThinkion(empresaId, monthsBack = 24) {
   // ── Ventas por producto × día (Report 320) ────────────────────────────────
   const allRows = [];
   for (const chunk of chunks) {
-    const rows = await fetchChunkCached(empresaId, 320, chunk, () =>
+    const { rows, fromApi } = await fetchChunkCached(empresaId, 320, chunk, () =>
       thinkionRequest(code, token, {
         id_report:      320,
         date_init:      chunk.date_init,
@@ -292,9 +296,8 @@ async function fetchCartaDataThinkion(empresaId, monthsBack = 24) {
       })
     );
     allRows.push(...rows);
-    // Pausa solo si vamos a Thinkion (mes actual o primera vez del cerrado)
-    // La pausa está implícita: fetchChunkCached es secuencial
-    if (!chunk.closed) await sleep(800);
+    // Pausar solo si se consultó la API (no si vino del disco) para evitar rate limit
+    if (fromApi) await sleep(800);
   }
 
   console.log(`[Thinkion/${empresaId}] Total carta: ${allRows.length} filas`);
@@ -369,7 +372,7 @@ function parseDatetime(str) {
 }
 
 // ── Turnos & Horarios (Report 233 — ventas reales con descuentos) ─────────────
-async function fetchVentasHorariosThinkion(empresaId, monthsBack = 24) {
+async function fetchVentasHorariosThinkion(empresaId, monthsBack = parseInt(process.env.THINKION_MONTHS_BACK) || 60) {
   const cfg = THINKION_CONFIG[empresaId];
   if (!cfg) throw new Error(`Empresa "${empresaId}" no tiene config Thinkion`);
 
@@ -380,7 +383,7 @@ async function fetchVentasHorariosThinkion(empresaId, monthsBack = 24) {
   // Usa TOTAL (no payment) → incluye descuentos correctamente
   const allRows = [];
   for (const chunk of chunks) {
-    const rows = await fetchChunkCached(empresaId, 233, chunk, () =>
+    const { rows, fromApi } = await fetchChunkCached(empresaId, 233, chunk, () =>
       thinkionRequest(code, token, {
         id_report:      233,
         date_init:      chunk.date_init,
@@ -389,7 +392,7 @@ async function fetchVentasHorariosThinkion(empresaId, monthsBack = 24) {
       })
     );
     allRows.push(...rows);
-    if (!chunk.closed) await sleep(800);
+    if (fromApi) await sleep(800);
   }
 
   console.log(`[Thinkion/${empresaId}] Total turnos (R233): ${allRows.length} ventas`);
@@ -445,7 +448,7 @@ async function fetchMovimientosStock(empresaId, monthsBack = 3) {
   // Sí los cacheamos en disco igual (datos que no cambian)
   const allRows = [];
   for (const chunk of chunks) {
-    const rows = await fetchChunkCached(empresaId, 283, chunk, () =>
+    const { rows, fromApi } = await fetchChunkCached(empresaId, 283, chunk, () =>
       thinkionRequest(code, token, {
         id_report:      283,
         date_init:      chunk.date_init,
@@ -454,7 +457,7 @@ async function fetchMovimientosStock(empresaId, monthsBack = 3) {
       })
     );
     allRows.push(...rows);
-    if (!chunk.closed) await sleep(800);
+    if (fromApi) await sleep(800);
   }
 
   console.log(`[Thinkion/${empresaId}] Total movimientos (R283): ${allRows.length} filas`);
