@@ -145,8 +145,33 @@
 
   <!-- Filter panel — sticky on desktop, collapsible on mobile/tablet -->
   <div id="filter-panel" class="filter-panel">
-    <div id="ms-ano"  class="ms-wrap"></div>
-    <div id="ms-mes"  class="ms-wrap"></div>
+
+    <!-- Toggle modo: Período vs Rango personalizado -->
+    <div class="filter-chips filter-mode-toggle">
+      <button class="chip active" id="mode-periodo"  data-mode="periodo">Por período</button>
+      <button class="chip"        id="mode-rango"    data-mode="rango">📅 Rango</button>
+    </div>
+
+    <!-- Modo PERÍODO: año y mes -->
+    <div id="ms-periodo-wrap">
+      <div id="ms-ano"  class="ms-wrap"></div>
+      <div id="ms-mes"  class="ms-wrap"></div>
+    </div>
+
+    <!-- Modo RANGO: desde / hasta -->
+    <div id="ms-rango-wrap" class="date-range-wrap" style="display:none">
+      <div class="date-range-field">
+        <label class="date-range-label">Desde</label>
+        <input type="month" id="filter-desde" class="date-range-input" />
+      </div>
+      <div class="date-range-sep">—</div>
+      <div class="date-range-field">
+        <label class="date-range-label">Hasta</label>
+        <input type="month" id="filter-hasta" class="date-range-input" />
+      </div>
+      <button id="btn-rango-clear" class="date-range-clear" title="Limpiar rango">✕</button>
+    </div>
+
     <div id="ms-cat"  class="ms-wrap"></div>
     <div id="ms-prod" class="ms-wrap"></div>
     <div id="ms-mix"  class="ms-wrap"></div>

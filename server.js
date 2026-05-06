@@ -391,8 +391,10 @@ app.get('/api/carta', async (req, res) => {
     const categorias = parse('categorias');
     const productos  = parse('productos');
     const mixes      = parse('mixes');
+    const desde      = req.query.desde || null;   // "YYYY-MM"
+    const hasta      = req.query.hasta || null;
 
-    const filtered = filterRecords(records, { anos, meses, categorias, productos, mixes });
+    const filtered = filterRecords(records, { anos, meses, categorias, productos, mixes, desde, hasta });
 
     // Catálogo completo (sin filtros) para los dropdowns del cliente
     const allRecords = records;

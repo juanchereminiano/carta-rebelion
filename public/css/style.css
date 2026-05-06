@@ -1281,6 +1281,60 @@ body {
   box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 
+/* ── Filtro: inputs de rango de fechas ───────────────────────────────────── */
+.filter-mode-toggle { flex-shrink: 0; }
+.filter-mode-toggle .chip { padding: 4px 10px; }
+
+.date-range-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.date-range-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.date-range-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  padding-left: 2px;
+}
+.date-range-input {
+  height: 30px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: var(--text);
+  background: var(--surface);
+  cursor: pointer;
+  outline: none;
+  transition: border-color .15s;
+}
+.date-range-input:focus { border-color: var(--accent); }
+.date-range-sep {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 14px;
+}
+.date-range-clear {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  padding: 4px 7px;
+  cursor: pointer;
+  margin-top: 14px;
+  transition: background .15s, color .15s;
+}
+.date-range-clear:hover { background: #fee2e2; color: #dc2626; border-color: #dc2626; }
+
 /* Filter toggle button — hidden on desktop */
 .btn-filter-toggle { display: none; }
 
@@ -1344,6 +1398,13 @@ body {
   .ms-btn  { width: 100%; justify-content: space-between; border-radius: 8px; padding: 8px 12px; }
   /* Panel: position:fixed se setea desde JS con coordenadas reales */
   .ms-panel { position: fixed; z-index: 600; }
+
+  /* Rango personalizado — ocupa el ancho en mobile */
+  .date-range-wrap { flex-wrap: wrap; width: 100%; }
+  .date-range-field { flex: 1; min-width: 120px; }
+  .date-range-input { width: 100%; }
+  .date-range-sep, .date-range-clear { margin-top: 0; }
+  .filter-mode-toggle .chip { flex: 1; }
 
   /* Metric toggle en el panel */
   .filter-panel .metric-toggle { justify-content: flex-start; padding-top: 4px; }

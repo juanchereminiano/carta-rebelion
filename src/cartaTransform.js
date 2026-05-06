@@ -13,25 +13,45 @@ const CAT_COLORS = [
 ];
 
 // ── Filtro ─────────────────────────────────────────────────────────────────────
-// Soporta parámetros simples (ano/mes string) y arrays (anos/meses/categorias/productos)
+// Soporta:
+//   - arrays  : anos/meses/categorias/productos/mixes  (MultiSelect del topbar)
+//   - strings : ano/mes  (legacy, params individuales)
+//   - rango   : desde/hasta  formato "YYYY-MM" — si está presente, reemplaza anos/meses
 function filterRecords(records, filters = {}) {
-  const { anos, meses, categorias, productos, mixes, ano, mes } = filters;
+  const { anos, meses, categorias, productos, mixes, ano, mes, desde, hasta } = filters;
 
-  // Normalizar a arrays (null = sin filtro activo)
-  const anosArr = anos && !anos.includes('all') ? anos.map(String)
-                : (ano && ano !== 'all' ? [String(ano)] : null);
-  const mesesArr = meses && !meses.includes('all') ? meses.map(m => m.toUpperCase())
-                 : (mes && mes !== 'all' ? [mes.toUpperCase()] : null);
+  // ── Rango personalizado ─────────────────────────────────────────────────────
+  const fromKey = desde || null;   // "YYYY-MM" o null
+  const toKey   = hasta || null;
+
+  // ── Filtros de período (solo cuando NO hay rango) ───────────────────────────
+  const anosArr = (fromKey || toKey) ? null
+    : (anos && !anos.includes('all') ? anos.map(String)
+    : (ano  && ano  !== 'all'        ? [String(ano)]    : null));
+
+  const mesesArr = (fromKey || toKey) ? null
+    : (meses && !meses.includes('all') ? meses.map(m => m.toUpperCase())
+    : (mes   && mes   !== 'all'        ? [mes.toUpperCase()]             : null));
+
   const catArr  = categorias && !categorias.includes('all') ? categorias : null;
   const prodArr = productos  && !productos.includes('all')  ? productos  : null;
-  const mixArr  = mixes && !mixes.includes('all') ? mixes : null;
+  const mixArr  = mixes      && !mixes.includes('all')      ? mixes      : null;
 
   return records.filter(r => {
-    if (anosArr  && !anosArr.includes(String(r.ano)))  return false;
-    if (mesesArr && !mesesArr.includes(r.mes))         return false;
-    if (catArr   && !catArr.includes(r.categoria))     return false;
-    if (prodArr  && !prodArr.includes(r.producto))     return false;
-    if (mixArr   && !mixArr.includes(r.mix))           return false;
+    // Rango personalizado (prioridad sobre año/mes)
+    if (fromKey || toKey) {
+      const mIdx1 = MES_ORDER.indexOf(r.mes) + 1;
+      if (mIdx1 <= 0) return false;
+      const rKey = `${r.ano}-${String(mIdx1).padStart(2, '0')}`;
+      if (fromKey && rKey < fromKey) return false;
+      if (toKey   && rKey > toKey)   return false;
+    } else {
+      if (anosArr  && !anosArr.includes(String(r.ano)))  return false;
+      if (mesesArr && !mesesArr.includes(r.mes))         return false;
+    }
+    if (catArr   && !catArr.includes(r.categoria))  return false;
+    if (prodArr  && !prodArr.includes(r.producto))  return false;
+    if (mixArr   && !mixArr.includes(r.mix))        return false;
     return true;
   });
 }

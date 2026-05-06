@@ -153,11 +153,15 @@ function triggerPrint(sectionIds, { includeDate, includeFilters }) {
   const filtersText = document.getElementById('ph-filters-text');
   if (filtersBar && filtersText && includeFilters) {
     const parts = [];
-    if (state.anos[0]       !== 'all') parts.push('Años: ' + state.anos.join(', '));
-    if (state.meses[0]      !== 'all') parts.push('Meses: ' + state.meses.join(', '));
+    if (state.filterMode === 'rango') {
+      if (state.desde || state.hasta) parts.push(`Período: ${state.desde || '…'} → ${state.hasta || '…'}`);
+    } else {
+      if (state.anos[0]  !== 'all') parts.push('Años: '  + state.anos.join(', '));
+      if (state.meses[0] !== 'all') parts.push('Meses: ' + state.meses.join(', '));
+    }
     if (state.categorias[0] !== 'all') parts.push('Categorías: ' + state.categorias.join(', '));
-    if (state.productos[0]  !== 'all') parts.push('Productos: ' + state.productos.join(', '));
-    if (state.mixes[0]      !== 'all') parts.push('Mix: ' + state.mixes.join(', '));
+    if (state.productos[0]  !== 'all') parts.push('Productos: '  + state.productos.join(', '));
+    if (state.mixes[0]      !== 'all') parts.push('Mix: '        + state.mixes.join(', '));
     if (state.metric !== 'ventas')     parts.push('Métrica: cantidades');
     filtersText.textContent = parts.length ? parts.join(' · ') : 'Sin filtros aplicados';
     filtersBar.style.display = parts.length ? '' : 'none';
@@ -510,6 +514,10 @@ const state = {
   productos:  ['all'],
   mixes:      ['all'],
   metric:     'ventas',
+  // Rango personalizado
+  filterMode: 'periodo',  // 'periodo' | 'rango'
+  desde:      '',         // 'YYYY-MM' o ''
+  hasta:      '',         // 'YYYY-MM' o ''
   // Tabla
   sortCol: 'rank', sortDir: 'asc',
   search: '', clase: 'all', tableCat: 'all',
@@ -742,8 +750,12 @@ function updateFilterBadge() {
   const badge = document.getElementById('filter-count-badge');
   if (!badge) return;
   let count = 0;
-  if (!state.anos.includes('all'))       count++;
-  if (!state.meses.includes('all'))      count++;
+  if (state.filterMode === 'rango') {
+    if (state.desde || state.hasta) count++;
+  } else {
+    if (!state.anos.includes('all'))  count++;
+    if (!state.meses.includes('all')) count++;
+  }
   if (!state.categorias.includes('all')) count++;
   if (!state.productos.includes('all'))  count++;
   if (!state.mixes.includes('all'))      count++;
@@ -889,6 +901,57 @@ function initFilters() {
     container: document.getElementById('ms-mix'),
     label: 'Mix',
     onChange: vals => { state.mixes = vals; updateFilterBadge(); loadData(); },
+  });
+}
+
+// ── Toggle Período / Rango ─────────────────────────────────────────────────
+function initFilterModeToggle() {
+  const btnPeriodo  = document.getElementById('mode-periodo');
+  const btnRango    = document.getElementById('mode-rango');
+  const wrapPeriodo = document.getElementById('ms-periodo-wrap');
+  const wrapRango   = document.getElementById('ms-rango-wrap');
+  const inputDesde  = document.getElementById('filter-desde');
+  const inputHasta  = document.getElementById('filter-hasta');
+  const btnClear    = document.getElementById('btn-rango-clear');
+
+  function setMode(mode) {
+    state.filterMode = mode;
+    const isRango = mode === 'rango';
+    btnPeriodo.classList.toggle('active', !isRango);
+    btnRango.classList.toggle('active',  isRango);
+    wrapPeriodo.style.display = isRango ? 'none' : '';
+    wrapRango.style.display   = isRango ? ''     : 'none';
+    updateFilterBadge();
+    loadData();
+  }
+
+  btnPeriodo.addEventListener('click', () => {
+    if (state.filterMode === 'periodo') return;
+    setMode('periodo');
+  });
+  btnRango.addEventListener('click', () => {
+    if (state.filterMode === 'rango') return;
+    setMode('rango');
+  });
+
+  inputDesde.addEventListener('change', () => {
+    state.desde = inputDesde.value;
+    updateFilterBadge();
+    loadData();
+  });
+  inputHasta.addEventListener('change', () => {
+    state.hasta = inputHasta.value;
+    updateFilterBadge();
+    loadData();
+  });
+
+  btnClear.addEventListener('click', () => {
+    state.desde = '';
+    state.hasta = '';
+    inputDesde.value = '';
+    inputHasta.value = '';
+    updateFilterBadge();
+    loadData();
   });
 }
 
@@ -2794,8 +2857,13 @@ async function loadData({ forceFlush = false } = {}) {
     }
 
     const params = new URLSearchParams({ metric: state.metric });
-    if (!state.anos.includes('all'))       params.set('anos',       state.anos.join(','));
-    if (!state.meses.includes('all'))      params.set('meses',      state.meses.join(','));
+    if (state.filterMode === 'rango') {
+      if (state.desde) params.set('desde', state.desde);
+      if (state.hasta) params.set('hasta', state.hasta);
+    } else {
+      if (!state.anos.includes('all'))  params.set('anos',  state.anos.join(','));
+      if (!state.meses.includes('all')) params.set('meses', state.meses.join(','));
+    }
     if (!state.categorias.includes('all')) params.set('categorias', state.categorias.join(','));
     if (!state.productos.includes('all'))  params.set('productos',  state.productos.join(','));
     if (!state.mixes.includes('all'))      params.set('mixes',      state.mixes.join(','));
@@ -3241,6 +3309,7 @@ initEmpresa();
 initAuth().then(() => {
   initFilterToggle();
   initFilters();
+  initFilterModeToggle();
   initSegFilters();
   renderSegChips();
   initSegSearch();
