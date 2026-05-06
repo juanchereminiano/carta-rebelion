@@ -364,12 +364,58 @@ function buildVentasResumen(records, { desde, hasta, anos, meses } = {}) {
     ordenes: evKeys.map(k => evMap[k].ordenes),
   };
 
+  // ── Comparativas del último mes disponible ────────────────────────────────
+  let comparativas = null;
+  if (evKeys.length >= 1) {
+    const lastKey  = evKeys[evKeys.length - 1];
+    const lastD    = evMap[lastKey];
+    const tickLast = lastD.ordenes > 0 ? lastD.ventas / lastD.ordenes : 0;
+
+    const comp = { lastKey, lastMes: lastD.mesNombre, lastAño: lastD.año };
+
+    // MoM: último mes vs mes anterior
+    if (evKeys.length >= 2) {
+      const prevKey  = evKeys[evKeys.length - 2];
+      const prevD    = evMap[prevKey];
+      const tickPrev = prevD.ordenes > 0 ? prevD.ventas / prevD.ordenes : 0;
+      comp.mom = {
+        label:       `${lastD.mesNombre.slice(0,3)} vs ${prevD.mesNombre.slice(0,3)} ${prevD.año}`,
+        ventasAct:   lastD.ventas,   ventasPrev:   prevD.ventas,
+        ordenesAct:  lastD.ordenes,  ordenesPrev:  prevD.ordenes,
+        ticketAct:   tickLast,       ticketPrev:   tickPrev,
+        pctVentas:   prevD.ventas  > 0 ? (lastD.ventas  - prevD.ventas)  / prevD.ventas  * 100 : null,
+        pctOrdenes:  prevD.ordenes > 0 ? (lastD.ordenes - prevD.ordenes) / prevD.ordenes * 100 : null,
+        pctTicket:   tickPrev      > 0 ? (tickLast      - tickPrev)      / tickPrev      * 100 : null,
+      };
+    }
+
+    // YoY: último mes vs mismo mes del año anterior
+    const [y, m] = lastKey.split('-');
+    const yoyKey = `${parseInt(y) - 1}-${m}`;
+    if (evMap[yoyKey]) {
+      const pyD    = evMap[yoyKey];
+      const tickPY = pyD.ordenes > 0 ? pyD.ventas / pyD.ordenes : 0;
+      comp.yoy = {
+        label:       `${lastD.mesNombre.slice(0,3)} ${y} vs ${parseInt(y) - 1}`,
+        ventasAct:   lastD.ventas,   ventasPrev:   pyD.ventas,
+        ordenesAct:  lastD.ordenes,  ordenesPrev:  pyD.ordenes,
+        ticketAct:   tickLast,       ticketPrev:   tickPY,
+        pctVentas:   pyD.ventas  > 0 ? (lastD.ventas  - pyD.ventas)  / pyD.ventas  * 100 : null,
+        pctOrdenes:  pyD.ordenes > 0 ? (lastD.ordenes - pyD.ordenes) / pyD.ordenes * 100 : null,
+        pctTicket:   tickPY      > 0 ? (tickLast      - tickPY)      / tickPY      * 100 : null,
+      };
+    }
+
+    comparativas = comp;
+  }
+
   return {
     totalOrdenes,
     totalVentas,
     facturacion,
     tabla: { meses: MES_ORDER, rows },
     evolucion,
+    comparativas,
   };
 }
 

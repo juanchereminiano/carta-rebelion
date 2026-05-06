@@ -585,6 +585,67 @@ body {
   font-weight: 600;
 }
 
+/* ── Widgets comparativas MoM / YoY ──────────────────────────────────────── */
+.ventas-comp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.comp-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.comp-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.comp-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.comp-rows { display: flex; flex-direction: column; gap: 6px; }
+.comp-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+}
+.comp-key {
+  min-width: 90px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.comp-pct {
+  font-weight: 700;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  min-width: 64px;
+}
+.comp-pct.comp-up    { color: #16a34a; }
+.comp-pct.comp-down  { color: #dc2626; }
+.comp-pct.comp-neutral { color: var(--muted); }
+.comp-vals {
+  color: var(--muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 600px) {
+  .ventas-comp-grid { grid-template-columns: 1fr; }
+}
+
 /* ── Two col ─────────────────────────────────────────────────────────────── */
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); min-width: 0; }
 .two-col > * { min-width: 0; }

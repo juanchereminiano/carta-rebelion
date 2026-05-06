@@ -195,6 +195,15 @@
         <div class="summary-card skeleton-card"><div class="skeleton" style="height:70px"></div></div>
         <div class="summary-card skeleton-card"><div class="skeleton" style="height:70px"></div></div>
         <div class="summary-card skeleton-card"><div class="skeleton" style="height:70px"></div></div>
+        <div class="summary-card skeleton-card"><div class="skeleton" style="height:70px"></div></div>
+      </div>
+
+      <!-- Evolución mensual ventas reales (R233) -->
+      <div class="card">
+        <h2>Evolución mensual de ventas</h2>
+        <div class="chart-wrap">
+          <canvas id="chart-ventas-evolucion"></canvas>
+        </div>
       </div>
 
       <!-- Tabla año × mes (R233) -->
@@ -202,8 +211,9 @@
         <div class="card-header-row">
           <h2>Ventas por año y mes</h2>
           <div class="filter-chips metric-toggle">
-            <button class="chip active" id="vtab-metric-ventas"  data-metric="ventas">$ Importe</button>
-            <button class="chip"        id="vtab-metric-ordenes" data-metric="ordenes">Órdenes</button>
+            <button class="chip active" id="vtab-metric-ventas"   data-metric="ventas">$ Importe</button>
+            <button class="chip"        id="vtab-metric-ordenes"  data-metric="ordenes">Órdenes</button>
+            <button class="chip"        id="vtab-metric-ticket"   data-metric="ticket">Ticket prom.</button>
           </div>
         </div>
         <div class="table-wrap">
@@ -212,6 +222,8 @@
             <tbody id="ventas-anio-tbody"></tbody>
           </table>
         </div>
+        <!-- Comparativas MoM / YoY -->
+        <div id="ventas-comp-grid" class="ventas-comp-grid"></div>
       </div>
 
       <!-- KPIs carta (R320) -->
@@ -249,15 +261,6 @@
 
       <!-- ABC cards -->
       <div id="abc-cards" class="abc-summary-grid"></div>
-
-      <!-- Evolución temporal -->
-      <div class="dash-section-label">Evolución</div>
-      <div class="card">
-        <h2>Evolución mensual de ventas</h2>
-        <div class="chart-wrap">
-          <canvas id="chart-evolucion"></canvas>
-        </div>
-      </div>
 
       <!-- Mix de Ventas -->
       <div class="dash-section-label">Mix de Ventas</div>

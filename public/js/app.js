@@ -1066,10 +1066,10 @@ function canvasGradient(canvasId, stops) {
 // ── KPIs Ventas Reales (R233) ──────────────────────────────────────────────
 function renderVentasKPIs(v) {
   if (!v) return;
-  const fTotal   = n => n == null ? '—' : n >= 1e9 ? '$'+(n/1e9).toFixed(2)+'B' : n >= 1e6 ? '$'+(n/1e6).toFixed(1)+'M' : n >= 1e3 ? '$'+(n/1e3).toFixed(0)+'k' : '$'+Math.round(n).toLocaleString('es-AR');
-  const fNum     = n => n == null ? '—' : Math.round(n).toLocaleString('es-AR');
-  const fPct     = (a, t) => t > 0 ? (a/t*100).toFixed(1)+'%' : '—';
+  const fNum = n => n == null ? '—' : Math.round(n).toLocaleString('es-AR');
+  const fPct = (a, t) => t > 0 ? (a/t*100).toFixed(1)+'%' : '—';
 
+  const ticket      = v.totalOrdenes > 0 ? Math.round(v.totalVentas / v.totalOrdenes) : null;
   const fiscalPct   = fPct(v.facturacion.fiscal,   v.totalVentas);
   const noFiscalPct = fPct(v.facturacion.noFiscal, v.totalVentas);
 
@@ -1081,17 +1081,22 @@ function renderVentasKPIs(v) {
     </div>
     <div class="summary-card">
       <div class="s-label">Importe total</div>
-      <div class="s-value">${fTotal(v.totalVentas)}</div>
-      <div class="s-sub">${v.totalOrdenes > 0 ? fTotal(Math.round(v.totalVentas / v.totalOrdenes)) + ' prom/orden' : ''}</div>
+      <div class="s-value">${fmt.pesosFull(v.totalVentas)}</div>
+      <div class="s-sub">ventas del período</div>
+    </div>
+    <div class="summary-card">
+      <div class="s-label">Ticket promedio</div>
+      <div class="s-value">${fmt.pesosFull(ticket)}</div>
+      <div class="s-sub">por orden</div>
     </div>
     <div class="summary-card">
       <div class="s-label">Fiscal (A / B)</div>
-      <div class="s-value">${fTotal(v.facturacion.fiscal)}</div>
+      <div class="s-value">${fmt.pesosFull(v.facturacion.fiscal)}</div>
       <div class="s-sub">${fiscalPct} · ${fNum(v.facturacion.fiscalOrdenes)} órdenes</div>
     </div>
     <div class="summary-card">
       <div class="s-label">No Fiscal (Despacho)</div>
-      <div class="s-value">${fTotal(v.facturacion.noFiscal)}</div>
+      <div class="s-value">${fmt.pesosFull(v.facturacion.noFiscal)}</div>
       <div class="s-sub">${noFiscalPct} · ${fNum(v.facturacion.noFiscalOrdenes)} órdenes</div>
     </div>
   `;
@@ -1109,10 +1114,32 @@ function renderVentasTabla(v, metric) {
 
   const MES_ORDER_FULL = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO',
                           'JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
-  const isV = metric !== 'ordenes';
-  const fCell = n => {
+  const isTicket  = metric === 'ticket';
+  const isOrdenes = metric === 'ordenes';
+  const isVentas  = !isTicket && !isOrdenes;
+
+  const fCell = (cell) => {
+    if (!cell) return '<span style="color:var(--muted)">—</span>';
+    if (isTicket) {
+      const t = cell.ordenes > 0 ? Math.round(cell.ventas / cell.ordenes) : null;
+      if (!t) return '<span style="color:var(--muted)">—</span>';
+      return t >= 1e6 ? '$'+(t/1e6).toFixed(1)+'M' : t >= 1e3 ? '$'+(t/1e3).toFixed(0)+'k' : '$'+t.toLocaleString('es-AR');
+    }
+    const n = isVentas ? (cell.ventas || 0) : (cell.ordenes || 0);
     if (!n) return '<span style="color:var(--muted)">—</span>';
-    if (isV) return n >= 1e6 ? '$'+(n/1e6).toFixed(1)+'M' : n >= 1e3 ? '$'+(n/1e3).toFixed(0)+'k' : '$'+Math.round(n).toLocaleString('es-AR');
+    if (isVentas) return n >= 1e6 ? '$'+(n/1e6).toFixed(1)+'M' : n >= 1e3 ? '$'+(n/1e3).toFixed(0)+'k' : '$'+Math.round(n).toLocaleString('es-AR');
+    return Math.round(n).toLocaleString('es-AR');
+  };
+
+  const fTotal = (total) => {
+    if (isTicket) {
+      const t = total.ordenes > 0 ? Math.round(total.ventas / total.ordenes) : null;
+      if (!t) return '—';
+      return t >= 1e6 ? '$'+(t/1e6).toFixed(1)+'M' : t >= 1e3 ? '$'+(t/1e3).toFixed(0)+'k' : '$'+t.toLocaleString('es-AR');
+    }
+    const n = isVentas ? total.ventas : total.ordenes;
+    if (!n) return '—';
+    if (isVentas) return n >= 1e6 ? '$'+(n/1e6).toFixed(1)+'M' : n >= 1e3 ? '$'+(n/1e3).toFixed(0)+'k' : '$'+Math.round(n).toLocaleString('es-AR');
     return Math.round(n).toLocaleString('es-AR');
   };
 
@@ -1122,39 +1149,83 @@ function renderVentasTabla(v, metric) {
   thead.innerHTML = `<tr>
     <th style="text-align:left">Año</th>
     ${MES_SHORT.map(m => `<th>${m}</th>`).join('')}
-    <th>Total</th>
+    <th>${isTicket ? 'Prom.' : 'Total'}</th>
   </tr>`;
 
-  // Calcular totales por mes (fila de totales)
-  const mesTotals = Array(12).fill(0);
-  let grandTotal = 0;
+  // Acumuladores para fila de totales
+  const mesAcc = Array(12).fill(null).map(() => ({ ventas: 0, ordenes: 0 }));
+  const grandAcc = { ventas: 0, ordenes: 0 };
 
   const rows = v.tabla.rows.map(row => {
-    const total = isV ? row.total.ventas : row.total.ordenes;
-    grandTotal += total;
+    grandAcc.ventas  += row.total.ventas;
+    grandAcc.ordenes += row.total.ordenes;
     const cells = MES_ORDER_FULL.map((mes, i) => {
       const cell = row.meses[i];
-      const val  = isV ? (cell?.ventas || 0) : (cell?.ordenes || 0);
-      mesTotals[i] += val;
-      return `<td>${fCell(val || null)}</td>`;
+      if (cell) { mesAcc[i].ventas += cell.ventas; mesAcc[i].ordenes += cell.ordenes; }
+      return `<td>${fCell(cell)}</td>`;
     });
     return `<tr>
       <td style="font-weight:600">${row.año}</td>
       ${cells.join('')}
-      <td style="font-weight:700;color:var(--accent)">${fCell(total)}</td>
+      <td style="font-weight:700;color:var(--accent)">${fTotal(row.total)}</td>
     </tr>`;
   });
 
-  // Fila de totales por columna
+  // Fila de totales/promedios por columna
   if (v.tabla.rows.length > 1) {
     rows.push(`<tr class="ventas-total-row">
-      <td style="font-weight:700">Total</td>
-      ${mesTotals.map(t => `<td style="font-weight:600">${fCell(t || null)}</td>`).join('')}
-      <td style="font-weight:700;color:var(--accent)">${fCell(grandTotal)}</td>
+      <td style="font-weight:700">${isTicket ? 'Prom.' : 'Total'}</td>
+      ${mesAcc.map(a => `<td style="font-weight:600">${fCell(a.ventas || a.ordenes ? a : null)}</td>`).join('')}
+      <td style="font-weight:700;color:var(--accent)">${fTotal(grandAcc)}</td>
     </tr>`);
   }
 
   tbody.innerHTML = rows.join('');
+
+  // ── Widgets comparativas ──────────────────────────────────────────────────
+  const compEl = document.getElementById('ventas-comp-grid');
+  if (!compEl) return;
+  const c = v.comparativas;
+  if (!c) { compEl.innerHTML = ''; return; }
+
+  const pctBadge = (pct, label) => {
+    if (pct == null) return `<span class="comp-pct comp-neutral">—</span>`;
+    const sign  = pct >= 0 ? '+' : '';
+    const cls   = pct >= 0 ? 'comp-up' : 'comp-down';
+    const arrow = pct >= 0 ? '▲' : '▼';
+    return `<span class="comp-pct ${cls}">${arrow} ${sign}${pct.toFixed(1)}%</span>`;
+  };
+
+  const compCard = (title, data) => {
+    if (!data) return '';
+    return `
+      <div class="comp-card">
+        <div class="comp-title">${title}</div>
+        <div class="comp-label">${data.label}</div>
+        <div class="comp-rows">
+          <div class="comp-row">
+            <span class="comp-key">Importe</span>
+            ${pctBadge(data.pctVentas)}
+            <span class="comp-vals">${fmt.pesosFull(Math.round(data.ventasAct))} vs ${fmt.pesosFull(Math.round(data.ventasPrev))}</span>
+          </div>
+          <div class="comp-row">
+            <span class="comp-key">Órdenes</span>
+            ${pctBadge(data.pctOrdenes)}
+            <span class="comp-vals">${Math.round(data.ordenesAct).toLocaleString('es-AR')} vs ${Math.round(data.ordenesPrev).toLocaleString('es-AR')}</span>
+          </div>
+          <div class="comp-row">
+            <span class="comp-key">Ticket prom.</span>
+            ${pctBadge(data.pctTicket)}
+            <span class="comp-vals">${fmt.pesosFull(Math.round(data.ticketAct))} vs ${fmt.pesosFull(Math.round(data.ticketPrev))}</span>
+          </div>
+        </div>
+      </div>`;
+  };
+
+  compEl.innerHTML = `
+    ${compCard('Mes vs mes anterior (MoM)', c.mom)}
+    ${compCard('Mes vs mismo mes año anterior (YoY)', c.yoy)}
+  `;
 }
 
 function renderSummary(s) {
@@ -1315,6 +1386,77 @@ function renderABCCards(pareto) {
 
 // ── EVOLUCIÓN ──────────────────────────────────────────────────────────────
 
+// Evolución basada en R233 (ventas reales) — canvas: chart-ventas-evolucion
+function renderVentasEvolucion(vdata) {
+  if (!vdata || !vdata.evolucion) return;
+  const evo = vdata.evolucion;
+  if (!evo.labels || !evo.labels.length) return;
+
+  upsertChart('chart-ventas-evolucion', {
+    data: {
+      labels: evo.labels,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Importe ($)',
+          data: evo.ventas,
+          backgroundColor: 'rgba(74,158,255,0.22)',
+          borderColor:     'rgba(74,158,255,0.55)',
+          borderWidth: 1,
+          borderRadius: 3,
+          yAxisID: 'y',
+          order: 2,
+        },
+        {
+          type: 'line',
+          label: 'Tendencia',
+          data: evo.ventas,
+          borderColor: '#4a9eff',
+          backgroundColor: 'transparent',
+          borderWidth: 2.5,
+          tension: 0.4,
+          pointRadius: 3,
+          pointBackgroundColor: '#4a9eff',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 1.5,
+          pointHoverRadius: 6,
+          yAxisID: 'y',
+          order: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true, aspectRatio: 3,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
+          label: ctx => {
+            if (ctx.dataset.type === 'line') return null;
+            const ordenes = evo.ordenes[ctx.dataIndex];
+            const ticket  = ordenes > 0 ? Math.round(ctx.parsed.y / ordenes) : null;
+            return [
+              ` Importe: ${fmt.pesosFull(ctx.parsed.y)}`,
+              ` Órdenes: ${Math.round(ordenes).toLocaleString('es-AR')}`,
+              ticket ? ` Ticket prom.: ${fmt.pesosFull(ticket)}` : null,
+            ].filter(Boolean);
+          },
+        }},
+      },
+      scales: {
+        x: CHART_DEFAULTS.scaleX,
+        y: {
+          ...CHART_DEFAULTS.scaleY,
+          ticks: { color: '#7b7f94',
+            callback: v => '$'+(v>=1e9?(v/1e9).toFixed(1)+'B':v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(0)+'k':v),
+          },
+        },
+      },
+    },
+  });
+}
+
+// Evolución basada en R320 (productos) — ya no se usa en dashboard principal
 function renderEvolucion(evo) {
   const isV = state.metric === 'ventas';
   const vals = isV ? evo.ventas : evo.cantidad;
@@ -2974,7 +3116,6 @@ function renderAll(data) {
   renderPareto(data.pareto);
   renderDonut(data.categorias, 'chart-donut', 'cat-legend');
   renderABCCards(data.pareto);
-  renderEvolucion(data.evolucion);
   renderDashTopTables(data.pareto.items);
   renderCatTable(data.categorias);
 
@@ -3027,6 +3168,7 @@ async function loadData({ forceFlush = false } = {}) {
     ventasData = vdata;
     renderAll(data);
     renderVentasKPIs(vdata);
+    renderVentasEvolucion(vdata);
     renderVentasTabla(vdata, vtabMetric);
     setRefreshStatus('ok');
   } catch (err) {
@@ -3475,13 +3617,14 @@ initAuth().then(() => {
   initInfProdSearch();
 
   // Toggle métrica tabla ventas año×mes
-  ['vtab-metric-ventas', 'vtab-metric-ordenes'].forEach(id => {
+  ['vtab-metric-ventas', 'vtab-metric-ordenes', 'vtab-metric-ticket'].forEach(id => {
     document.getElementById(id)?.addEventListener('click', e => {
       const m = e.currentTarget.dataset.metric;
       if (vtabMetric === m) return;
       vtabMetric = m;
       document.getElementById('vtab-metric-ventas').classList.toggle('active',  m === 'ventas');
       document.getElementById('vtab-metric-ordenes').classList.toggle('active', m === 'ordenes');
+      document.getElementById('vtab-metric-ticket').classList.toggle('active',  m === 'ticket');
       if (ventasData) renderVentasTabla(ventasData, vtabMetric);
     });
   });
