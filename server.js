@@ -39,6 +39,7 @@ const {
   buildSeasonStats,
   buildWeekdayStats,
   buildCatalog,
+  buildVentasResumen,
 } = require('./src/ventasHorariosTransform');
 const auth = require('./src/auth');
 
@@ -583,6 +584,25 @@ app.get('/api/ipc', async (req, res) => {
   }
 });
 
+// ── Ventas reales (R233): órdenes, importe, facturación, tabla año×mes ────────
+app.get('/api/ventas', async (req, res) => {
+  try {
+    const empresaId = req.session?.empresa || 'rebelion';
+    const allRecords = await getTurnosData(empresaId);
+
+    const parse = key => req.query[key] ? req.query[key].split(',').map(s => s.trim()) : ['all'];
+    const anos  = parse('anos');
+    const meses = parse('meses');
+    const desde = req.query.desde || null;
+    const hasta = req.query.hasta || null;
+
+    res.json(buildVentasResumen(allRecords, { desde, hasta, anos, meses }));
+  } catch (err) {
+    console.error('Error /api/ventas:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Limpiar cache (toda o solo la empresa actual)
 app.post('/api/refresh', (req, res) => {
   const empresaId = req.session?.empresa;
@@ -637,31 +657,32 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 // Corre en background después de que el servidor empieza a escuchar.
 // Descarga y cachea en disco todos los meses que falten, sin bloquear requests.
 // En Railway: el primer arranque baja los meses viejos; los siguientes son instantáneos.
+// Warmup: solo rellena el cache en DISCO (sin tocar el NodeCache de memoria).
+// Así evitamos pisar datos ya cargados con catálogo actualizado.
+// Los requests normales llenan el NodeCache a demanda y siempre leen el catálogo fresh.
 async function warmupCaches() {
   const empresas = [...THINKION_EMPRESAS];
-  console.log(`[Warmup] Iniciando pre-carga para: ${empresas.join(', ')}`);
+  console.log(`[Warmup] Iniciando pre-carga de disco para: ${empresas.join(', ')}`);
 
   for (const empresaId of empresas) {
     try {
-      console.log(`[Warmup] Cargando carta para ${empresaId}…`);
-      const data = await fetchCartaDataThinkion(empresaId);
-      cache.set(`carta_${empresaId}`, data);
-      console.log(`[Warmup] ${empresaId}: ${data.records.length} registros listos`);
+      console.log(`[Warmup] Carta ${empresaId}…`);
+      await fetchCartaDataThinkion(empresaId);
+      console.log(`[Warmup] Carta ${empresaId} OK`);
     } catch (err) {
-      console.warn(`[Warmup] Error en carta ${empresaId}:`, err.message);
+      console.warn(`[Warmup] Error carta ${empresaId}:`, err.message);
     }
 
     try {
-      console.log(`[Warmup] Cargando turnos para ${empresaId}…`);
-      const turnos = await fetchVentasHorariosThinkion(empresaId);
-      turnosCache.set(`turnos_${empresaId}`, turnos);
-      console.log(`[Warmup] ${empresaId}: ${turnos.length} registros de turnos listos`);
+      console.log(`[Warmup] Turnos ${empresaId}…`);
+      await fetchVentasHorariosThinkion(empresaId);
+      console.log(`[Warmup] Turnos ${empresaId} OK`);
     } catch (err) {
-      console.warn(`[Warmup] Error en turnos ${empresaId}:`, err.message);
+      console.warn(`[Warmup] Error turnos ${empresaId}:`, err.message);
     }
   }
 
-  console.log('[Warmup] Pre-carga completa.');
+  console.log('[Warmup] Pre-carga de disco completa.');
 }
 
 const PORT = process.env.PORT || 3000;

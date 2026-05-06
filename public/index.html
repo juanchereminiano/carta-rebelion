@@ -28,7 +28,7 @@
   <nav class="sidebar-nav">
     <a class="nav-item active" data-section="dashboard">
       <span class="nav-icon">▦</span>
-      <span class="nav-label">Dashboard Carta</span>
+      <span class="nav-label">Dashboard</span>
     </a>
     <a class="nav-item" data-section="tabla">
       <span class="nav-icon">≡</span>
@@ -186,9 +186,36 @@
 
     <!-- DASHBOARD ─────────────────────────────────────────────────────── -->
     <section id="section-dashboard" class="page-section active">
-      <div class="section-print-title">Dashboard Carta</div>
+      <div class="section-print-title">Dashboard</div>
 
-      <!-- KPIs -->
+      <!-- KPIs Ventas Reales (R233) -->
+      <div class="dash-section-label">Ventas</div>
+      <div id="ventas-grid" class="summary-grid">
+        <div class="summary-card skeleton-card"><div class="skeleton" style="height:70px"></div></div>
+        <div class="summary-card skeleton-card"><div class="skeleton" style="height:70px"></div></div>
+        <div class="summary-card skeleton-card"><div class="skeleton" style="height:70px"></div></div>
+        <div class="summary-card skeleton-card"><div class="skeleton" style="height:70px"></div></div>
+      </div>
+
+      <!-- Tabla año × mes (R233) -->
+      <div class="card" id="ventas-tabla-card">
+        <div class="card-header-row">
+          <h2>Ventas por año y mes</h2>
+          <div class="filter-chips metric-toggle">
+            <button class="chip active" id="vtab-metric-ventas"  data-metric="ventas">$ Importe</button>
+            <button class="chip"        id="vtab-metric-ordenes" data-metric="ordenes">Órdenes</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="metrics-table ventas-anio-table" id="ventas-anio-table">
+            <thead id="ventas-anio-thead"></thead>
+            <tbody id="ventas-anio-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- KPIs carta (R320) -->
+      <div class="dash-section-label">Carta (productos)</div>
       <div id="summary-grid" class="summary-grid">
         <div class="summary-card skeleton-card"><div class="skeleton" style="height:70px"></div></div>
         <div class="summary-card skeleton-card"><div class="skeleton" style="height:70px"></div></div>

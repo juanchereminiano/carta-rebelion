@@ -527,6 +527,8 @@ const state = {
 const charts = {};
 let allItems  = [];
 let rawData   = null;
+let ventasData = null;   // datos de R233 (ordenes, importe, facturacion, tabla)
+let vtabMetric = 'ventas';  // métrica activa en tabla año×mes
 
 // Catálogo completo (años, meses, cats, productos)
 let catalog = { anos: [], meses: [], categorias: [], productos: [] };
@@ -1033,6 +1035,100 @@ function canvasGradient(canvasId, stops) {
 
 // ── DASHBOARD ──────────────────────────────────────────────────────────────
 
+// ── KPIs Ventas Reales (R233) ──────────────────────────────────────────────
+function renderVentasKPIs(v) {
+  if (!v) return;
+  const fTotal   = n => n == null ? '—' : n >= 1e9 ? '$'+(n/1e9).toFixed(2)+'B' : n >= 1e6 ? '$'+(n/1e6).toFixed(1)+'M' : n >= 1e3 ? '$'+(n/1e3).toFixed(0)+'k' : '$'+Math.round(n).toLocaleString('es-AR');
+  const fNum     = n => n == null ? '—' : Math.round(n).toLocaleString('es-AR');
+  const fPct     = (a, t) => t > 0 ? (a/t*100).toFixed(1)+'%' : '—';
+
+  const fiscalPct   = fPct(v.facturacion.fiscal,   v.totalVentas);
+  const noFiscalPct = fPct(v.facturacion.noFiscal, v.totalVentas);
+
+  document.getElementById('ventas-grid').innerHTML = `
+    <div class="summary-card">
+      <div class="s-label">Órdenes</div>
+      <div class="s-value">${fNum(v.totalOrdenes)}</div>
+      <div class="s-sub">total del período</div>
+    </div>
+    <div class="summary-card">
+      <div class="s-label">Importe total</div>
+      <div class="s-value">${fTotal(v.totalVentas)}</div>
+      <div class="s-sub">${v.totalOrdenes > 0 ? fTotal(Math.round(v.totalVentas / v.totalOrdenes)) + ' prom/orden' : ''}</div>
+    </div>
+    <div class="summary-card">
+      <div class="s-label">Fiscal (A / B)</div>
+      <div class="s-value">${fTotal(v.facturacion.fiscal)}</div>
+      <div class="s-sub">${fiscalPct} · ${fNum(v.facturacion.fiscalOrdenes)} órdenes</div>
+    </div>
+    <div class="summary-card">
+      <div class="s-label">No Fiscal (Despacho)</div>
+      <div class="s-value">${fTotal(v.facturacion.noFiscal)}</div>
+      <div class="s-sub">${noFiscalPct} · ${fNum(v.facturacion.noFiscalOrdenes)} órdenes</div>
+    </div>
+  `;
+}
+
+// ── Tabla año × mes (R233) ─────────────────────────────────────────────────
+const MES_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+function renderVentasTabla(v, metric) {
+  if (!v || !v.tabla || !v.tabla.rows.length) {
+    document.getElementById('ventas-tabla-card').style.display = 'none';
+    return;
+  }
+  document.getElementById('ventas-tabla-card').style.display = '';
+
+  const MES_ORDER_FULL = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO',
+                          'JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+  const isV = metric !== 'ordenes';
+  const fCell = n => {
+    if (!n) return '<span style="color:var(--muted)">—</span>';
+    if (isV) return n >= 1e6 ? '$'+(n/1e6).toFixed(1)+'M' : n >= 1e3 ? '$'+(n/1e3).toFixed(0)+'k' : '$'+Math.round(n).toLocaleString('es-AR');
+    return Math.round(n).toLocaleString('es-AR');
+  };
+
+  const thead = document.getElementById('ventas-anio-thead');
+  const tbody = document.getElementById('ventas-anio-tbody');
+
+  thead.innerHTML = `<tr>
+    <th style="text-align:left">Año</th>
+    ${MES_SHORT.map(m => `<th>${m}</th>`).join('')}
+    <th>Total</th>
+  </tr>`;
+
+  // Calcular totales por mes (fila de totales)
+  const mesTotals = Array(12).fill(0);
+  let grandTotal = 0;
+
+  const rows = v.tabla.rows.map(row => {
+    const total = isV ? row.total.ventas : row.total.ordenes;
+    grandTotal += total;
+    const cells = MES_ORDER_FULL.map((mes, i) => {
+      const cell = row.meses[i];
+      const val  = isV ? (cell?.ventas || 0) : (cell?.ordenes || 0);
+      mesTotals[i] += val;
+      return `<td>${fCell(val || null)}</td>`;
+    });
+    return `<tr>
+      <td style="font-weight:600">${row.año}</td>
+      ${cells.join('')}
+      <td style="font-weight:700;color:var(--accent)">${fCell(total)}</td>
+    </tr>`;
+  });
+
+  // Fila de totales por columna
+  if (v.tabla.rows.length > 1) {
+    rows.push(`<tr class="ventas-total-row">
+      <td style="font-weight:700">Total</td>
+      ${mesTotals.map(t => `<td style="font-weight:600">${fCell(t || null)}</td>`).join('')}
+      <td style="font-weight:700;color:var(--accent)">${fCell(grandTotal)}</td>
+    </tr>`);
+  }
+
+  tbody.innerHTML = rows.join('');
+}
+
 function renderSummary(s) {
   const isV = state.metric === 'ventas';
   document.getElementById('summary-grid').innerHTML = `
@@ -1193,30 +1289,55 @@ function renderABCCards(pareto) {
 
 function renderEvolucion(evo) {
   const isV = state.metric === 'ventas';
-  const grad = canvasGradient('chart-evolucion', [
-    [0,   'rgba(74,158,255,0.28)'],
-    [0.6, 'rgba(74,158,255,0.06)'],
-    [1,   'rgba(74,158,255,0.00)'],
-  ]);
+  const vals = isV ? evo.ventas : evo.cantidad;
 
   upsertChart('chart-evolucion', {
-    type: 'line',
     data: {
       labels: evo.labels,
-      datasets: [{
-        label: isV ? 'Ventas $' : 'Cantidad',
-        data: isV ? evo.ventas : evo.cantidad,
-        borderColor: '#4a9eff',
-        backgroundColor: grad,
-        borderWidth: 2.5,
-        tension: 0.4,
-        pointRadius: 4,
-        pointBackgroundColor: '#4a9eff',
-        pointBorderColor: '#fff',
-        pointBorderWidth: 2,
-        pointHoverRadius: 6,
-        fill: true,
-      }],
+      datasets: [
+        {
+          type: 'bar',
+          label: isV ? 'Ventas $' : 'Cantidad',
+          data: vals,
+          backgroundColor: 'rgba(74,158,255,0.22)',
+          borderColor:     'rgba(74,158,255,0.55)',
+          borderWidth: 1,
+          borderRadius: 3,
+          yAxisID: 'y',
+          order: 2,
+          datalabels: {
+            display: ctx => {
+              // Mostrar etiqueta solo en el valor máximo y en el último dato
+              const data = ctx.dataset.data;
+              const maxVal = Math.max(...data);
+              return ctx.dataset.data[ctx.dataIndex] === maxVal || ctx.dataIndex === data.length - 1;
+            },
+            anchor: 'end', align: 'top',
+            color: '#4a9eff',
+            font: { size: 9, weight: '600' },
+            formatter: v => isV
+              ? (v >= 1e6 ? '$'+(v/1e6).toFixed(1)+'M' : v >= 1e3 ? '$'+(v/1e3).toFixed(0)+'k' : '$'+Math.round(v))
+              : (v >= 1e3 ? (v/1e3).toFixed(1)+'k' : Math.round(v)),
+          },
+        },
+        {
+          type: 'line',
+          label: isV ? 'Tendencia' : 'Tendencia',
+          data: vals,
+          borderColor: '#4a9eff',
+          backgroundColor: 'transparent',
+          borderWidth: 2.5,
+          tension: 0.4,
+          pointRadius: 3,
+          pointBackgroundColor: '#4a9eff',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 1.5,
+          pointHoverRadius: 6,
+          yAxisID: 'y',
+          order: 1,
+          datalabels: { display: false },
+        },
+      ],
     },
     options: {
       responsive: true, maintainAspectRatio: true, aspectRatio: 3,
@@ -1232,7 +1353,9 @@ function renderEvolucion(evo) {
         y: {
           ...CHART_DEFAULTS.scaleY,
           ticks: { color: '#7b7f94',
-            callback: v => isV ? '$'+(v>=1e6?(v/1e6).toFixed(1)+'M':(v>=1e3?(v/1e3).toFixed(0)+'k':v)) : fmt.num(v),
+            callback: v => isV
+              ? '$'+(v>=1e9?(v/1e9).toFixed(1)+'B':v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(0)+'k':v)
+              : fmt.num(v),
           },
         },
       },
@@ -2868,9 +2991,15 @@ async function loadData({ forceFlush = false } = {}) {
     if (!state.productos.includes('all'))  params.set('productos',  state.productos.join(','));
     if (!state.mixes.includes('all'))      params.set('mixes',      state.mixes.join(','));
 
-    const data = await fetch(`/api/carta?${params}`).then(r => r.json());
+    const [data, vdata] = await Promise.all([
+      fetch(`/api/carta?${params}`).then(r => r.json()),
+      fetch(`/api/ventas?${params}`).then(r => r.json()),
+    ]);
     if (data.error) throw new Error(data.error);
+    ventasData = vdata;
     renderAll(data);
+    renderVentasKPIs(vdata);
+    renderVentasTabla(vdata, vtabMetric);
     setRefreshStatus('ok');
   } catch (err) {
     console.error(err);
@@ -3316,6 +3445,19 @@ initAuth().then(() => {
   initInfProdFilters();
   renderInfProdChips();
   initInfProdSearch();
+
+  // Toggle métrica tabla ventas año×mes
+  ['vtab-metric-ventas', 'vtab-metric-ordenes'].forEach(id => {
+    document.getElementById(id)?.addEventListener('click', e => {
+      const m = e.currentTarget.dataset.metric;
+      if (vtabMetric === m) return;
+      vtabMetric = m;
+      document.getElementById('vtab-metric-ventas').classList.toggle('active',  m === 'ventas');
+      document.getElementById('vtab-metric-ordenes').classList.toggle('active', m === 'ordenes');
+      if (ventasData) renderVentasTabla(ventasData, vtabMetric);
+    });
+  });
+
   _startAutoRefresh();
   loadData();
 });

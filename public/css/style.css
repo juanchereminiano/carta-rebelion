@@ -569,6 +569,22 @@ body {
   margin-top: 4px;
 }
 
+/* ── Tabla ventas año × mes ──────────────────────────────────────────────── */
+.ventas-anio-table th,
+.ventas-anio-table td {
+  text-align: right;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  padding: 6px 10px;
+}
+.ventas-anio-table th:first-child,
+.ventas-anio-table td:first-child { text-align: left; }
+.ventas-anio-table .ventas-total-row td {
+  background: var(--bg);
+  border-top: 2px solid var(--border);
+  font-weight: 600;
+}
+
 /* ── Two col ─────────────────────────────────────────────────────────────── */
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); min-width: 0; }
 .two-col > * { min-width: 0; }

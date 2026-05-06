@@ -287,6 +287,92 @@ function buildCatalog(records) {
   return { anos, meses, dias };
 }
 
+// ── Resumen de ventas reales (R233) con filtros de fecha ──────────────────────
+// Usado por /api/carta para los KPIs de Órdenes, Importe y Facturación.
+// records: array completo de R233 (ya procesado por fetchVentasHorariosThinkion)
+// filters: { desde, hasta, anos, meses }  — mismo formato que /api/carta
+function buildVentasResumen(records, { desde, hasta, anos, meses } = {}) {
+  const fromKey = desde || null;  // 'YYYY-MM'
+  const toKey   = hasta || null;
+
+  const anosArr  = (fromKey || toKey) ? null
+    : (anos  && !anos.includes('all')  ? anos.map(String) : null);
+  const mesesArr = (fromKey || toKey) ? null
+    : (meses && !meses.includes('all') ? meses.map(m => m.toUpperCase()) : null);
+
+  const filtered = records.filter(r => {
+    if (fromKey || toKey) {
+      const rKey = `${r.año}-${String(r.mes).padStart(2, '0')}`;
+      if (fromKey && rKey < fromKey) return false;
+      if (toKey   && rKey > toKey)   return false;
+    } else {
+      if (anosArr  && !anosArr.includes(String(r.año)))    return false;
+      if (mesesArr && !mesesArr.includes(r.mesNombre))     return false;
+    }
+    return true;
+  });
+
+  const totalOrdenes = filtered.length;
+  const totalVentas  = filtered.reduce((s, r) => s + (r.venta || 0), 0);
+
+  // Facturación: DESPACHO = no fiscal, A/B = fiscal
+  const facturacion = { fiscal: 0, noFiscal: 0, fiscalOrdenes: 0, noFiscalOrdenes: 0 };
+  filtered.forEach(r => {
+    const t = (r.tipoTicket || '').toUpperCase();
+    if (t === 'DESPACHO' || t === 'D') {
+      facturacion.noFiscal += r.venta || 0;
+      facturacion.noFiscalOrdenes++;
+    } else {
+      facturacion.fiscal += r.venta || 0;
+      facturacion.fiscalOrdenes++;
+    }
+  });
+
+  // Tabla año × mes
+  const tableMap = {};   // año → { mes: { ventas, ordenes } }
+  filtered.forEach(r => {
+    const a = r.año;
+    const m = r.mesNombre;
+    if (!tableMap[a]) tableMap[a] = {};
+    if (!tableMap[a][m]) tableMap[a][m] = { ventas: 0, ordenes: 0 };
+    tableMap[a][m].ventas  += r.venta || 0;
+    tableMap[a][m].ordenes += 1;
+  });
+
+  const años = Object.keys(tableMap).map(Number).sort();
+  const rows = años.map(año => {
+    const mesesData = MES_ORDER.map(mes => tableMap[año]?.[mes] || null);
+    const total = mesesData.reduce((s, m) => ({
+      ventas:  s.ventas  + (m?.ventas  || 0),
+      ordenes: s.ordenes + (m?.ordenes || 0),
+    }), { ventas: 0, ordenes: 0 });
+    return { año, meses: mesesData, total };
+  });
+
+  // Evolución mensual (para el gráfico)
+  const evMap = {};
+  filtered.forEach(r => {
+    const key = `${r.año}-${String(r.mes).padStart(2, '0')}`;
+    if (!evMap[key]) evMap[key] = { año: r.año, mesNombre: r.mesNombre, ventas: 0, ordenes: 0 };
+    evMap[key].ventas  += r.venta || 0;
+    evMap[key].ordenes += 1;
+  });
+  const evKeys = Object.keys(evMap).sort();
+  const evolucion = {
+    labels:  evKeys.map(k => { const d = evMap[k]; return `${d.mesNombre.slice(0,3)} ${d.año}`; }),
+    ventas:  evKeys.map(k => evMap[k].ventas),
+    ordenes: evKeys.map(k => evMap[k].ordenes),
+  };
+
+  return {
+    totalOrdenes,
+    totalVentas,
+    facturacion,
+    tabla: { meses: MES_ORDER, rows },
+    evolucion,
+  };
+}
+
 module.exports = {
   filterVentas,
   buildHourlyStats,
@@ -296,4 +382,5 @@ module.exports = {
   buildSeasonStats,
   buildWeekdayStats,
   buildCatalog,
+  buildVentasResumen,
 };
