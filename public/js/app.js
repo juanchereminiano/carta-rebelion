@@ -916,6 +916,28 @@ function initFilterModeToggle() {
   const inputHasta  = document.getElementById('filter-hasta');
   const btnClear    = document.getElementById('btn-rango-clear');
 
+  // Mes actual como límite máximo (no permitir fechas futuras)
+  const now = new Date();
+  const maxMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  inputDesde.max = maxMonth;
+  inputHasta.max = maxMonth;
+
+  // Defaults cuando se activa el modo Rango por primera vez:
+  // Hasta = mes actual, Desde = vacío (sin límite inferior → ver todo el historial)
+  function applyRangoDefaults() {
+    if (!state.hasta) {
+      state.hasta      = maxMonth;
+      inputHasta.value = maxMonth;
+    }
+  }
+
+  // Sincroniza min de "Hasta" con el valor de "Desde" y viceversa
+  function syncConstraints() {
+    if (state.desde) inputHasta.min = state.desde;
+    if (state.hasta) inputDesde.max = state.hasta;
+    else             inputDesde.max = maxMonth;
+  }
+
   function setMode(mode) {
     state.filterMode = mode;
     const isRango = mode === 'rango';
@@ -923,6 +945,8 @@ function initFilterModeToggle() {
     btnRango.classList.toggle('active',  isRango);
     wrapPeriodo.style.display = isRango ? 'none' : '';
     wrapRango.style.display   = isRango ? ''     : 'none';
+    if (isRango) applyRangoDefaults();
+    syncConstraints();
     updateFilterBadge();
     loadData();
   }
@@ -938,20 +962,24 @@ function initFilterModeToggle() {
 
   inputDesde.addEventListener('change', () => {
     state.desde = inputDesde.value;
+    syncConstraints();
     updateFilterBadge();
     loadData();
   });
   inputHasta.addEventListener('change', () => {
     state.hasta = inputHasta.value;
+    syncConstraints();
     updateFilterBadge();
     loadData();
   });
 
   btnClear.addEventListener('click', () => {
-    state.desde = '';
-    state.hasta = '';
+    state.desde      = '';
+    state.hasta      = maxMonth;
     inputDesde.value = '';
-    inputHasta.value = '';
+    inputHasta.value = maxMonth;
+    inputHasta.min   = '';
+    inputDesde.max   = maxMonth;
     updateFilterBadge();
     loadData();
   });
