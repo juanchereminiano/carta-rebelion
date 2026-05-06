@@ -76,6 +76,9 @@ function buildPareto(records, metric = 'ventas') {
         cantidad:   0,
       };
     }
+    // Si el primer registro tenía valor vacío pero ahora hay uno, usarlo
+    if (r.mix      && map[r.producto].mix      === '—') map[r.producto].mix      = r.mix;
+    if (r.categoria && map[r.producto].categoria === '—') map[r.producto].categoria = r.categoria;
     map[r.producto].ventas   += r.dinero || 0;
     map[r.producto].cantidad += r.cant   || 0;
   }
@@ -205,6 +208,9 @@ function buildBCGData(records) {
     if (!r.producto || !r.ano) continue;
     if (!byProduct[r.producto])
       byProduct[r.producto] = { categoria: r.categoria || '—', byYear: {} };
+    // Actualizar categoría si el primer registro tenía valor vacío
+    if (r.categoria && byProduct[r.producto].categoria === '—')
+      byProduct[r.producto].categoria = r.categoria;
     if (!byProduct[r.producto].byYear[r.ano])
       byProduct[r.producto].byYear[r.ano] = { ventas: 0, cantidad: 0 };
     byProduct[r.producto].byYear[r.ano].ventas   += r.dinero || 0;

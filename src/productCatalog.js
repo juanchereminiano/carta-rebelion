@@ -14,7 +14,11 @@
 const fs   = require('fs');
 const path = require('path');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
+// En Railway: el volumen persistente está en THINKION_DATA_DIR (ej: /data).
+// Guardamos el catálogo ahí para que sobreviva redeploys.
+// Localmente cae en ./data (mismo que el cache de Thinkion).
+const DATA_DIR = process.env.THINKION_DATA_DIR
+  || path.join(__dirname, '..', 'data');
 
 function catalogFile(empresaId) {
   return path.join(DATA_DIR, `productos-${empresaId}.json`);
@@ -82,8 +86,11 @@ function buildProductList(empresaId) {
 
       for (const row of rows) {
         if (!row.product) continue;
-        const id     = String(row.id_product || '');
-        const key    = id || row.product.trim().toUpperCase();
+        const rawId  = row.id_product;
+        // Mismo criterio que thinkionAPI: id numérico (≠0) o nombre en mayúscula
+        const key    = (rawId != null && rawId !== 0 && rawId !== '')
+                     ? String(rawId)
+                     : row.product.trim().toUpperCase();
         const venta  = parseFloat(row.sale) || 0;
 
         if (!productos[key]) {

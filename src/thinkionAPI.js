@@ -309,17 +309,25 @@ async function fetchCartaDataThinkion(empresaId, monthsBack = 24) {
     const dinero = parseFloat(row.sale)  || 0;
     if (!row.product || (!cant && !dinero)) continue;
 
-    const idStr       = String(row.id_product || '');
     const nombreRaw   = (row.product || '').trim();
     const nombreUpper = nombreRaw.toUpperCase();
-    const catEntry    = catalog[idStr] || {};
+
+    // La clave del catálogo: id numérico si existe y no es 0/null, sino nombre en mayúscula.
+    // Mismo criterio que buildProductList para garantizar consistencia entre ambos módulos.
+    const rawId  = row.id_product;
+    const idStr  = (rawId != null && rawId !== 0 && rawId !== '')
+                 ? String(rawId)
+                 : nombreUpper;
+
+    const catEntry = catalog[idStr] || {};
 
     // Prioridad: catálogo maestro → categorías manuales legacy → Thinkion
+    const thinkionCatKey = String(rawId || '');
     const categoria =
-      catEntry.categoria     ||
-      manualCats[idStr]      ||
-      manualCats[nombreUpper]||
-      thinkionCatById[idStr] ||
+      catEntry.categoria          ||
+      manualCats[idStr]           ||
+      manualCats[nombreUpper]     ||
+      thinkionCatById[thinkionCatKey] ||
       '';
 
     // nombreInforme normaliza productos renombrados a lo largo del tiempo
