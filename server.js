@@ -631,7 +631,40 @@ app.get('/api/movimientos', async (req, res) => {
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
+// ── Warmup: pre-carga histórica al arrancar ──────────────────────────────────
+// Corre en background después de que el servidor empieza a escuchar.
+// Descarga y cachea en disco todos los meses que falten, sin bloquear requests.
+// En Railway: el primer arranque baja los meses viejos; los siguientes son instantáneos.
+async function warmupCaches() {
+  const empresas = [...THINKION_EMPRESAS];
+  console.log(`[Warmup] Iniciando pre-carga para: ${empresas.join(', ')}`);
+
+  for (const empresaId of empresas) {
+    try {
+      console.log(`[Warmup] Cargando carta para ${empresaId}…`);
+      const data = await fetchCartaDataThinkion(empresaId);
+      cache.set(`carta_${empresaId}`, data);
+      console.log(`[Warmup] ${empresaId}: ${data.records.length} registros listos`);
+    } catch (err) {
+      console.warn(`[Warmup] Error en carta ${empresaId}:`, err.message);
+    }
+
+    try {
+      console.log(`[Warmup] Cargando turnos para ${empresaId}…`);
+      const turnos = await fetchVentasHorariosThinkion(empresaId);
+      turnosCache.set(`turnos_${empresaId}`, turnos);
+      console.log(`[Warmup] ${empresaId}: ${turnos.length} registros de turnos listos`);
+    } catch (err) {
+      console.warn(`[Warmup] Error en turnos ${empresaId}:`, err.message);
+    }
+  }
+
+  console.log('[Warmup] Pre-carga completa.');
+}
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Carta Rebelión corriendo en http://localhost:${PORT}`);
+  // Lanzar warmup en background, sin bloquear el servidor
+  warmupCaches().catch(err => console.error('[Warmup] Error general:', err.message));
 });
