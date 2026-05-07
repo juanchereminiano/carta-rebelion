@@ -431,6 +431,12 @@ app.get('/api/carta', async (req, res) => {
       productos:  buildTopItems(allRecords, 9999).map(i => ({ producto: i.producto, categoria: i.categoria })),
     };
 
+    // Productos excluidos del análisis de inflación (campo excluirInflacion del catálogo)
+    const productList      = buildProductList(empresaId);
+    const excludedInflacion = new Set(
+      productList.filter(p => p.excluirInflacion).map(p => p.nombreInforme)
+    );
+
     res.json({
       summary:      buildSummary(filtered),
       pareto:       buildPareto(filtered, metric),
@@ -438,7 +444,7 @@ app.get('/api/carta', async (req, res) => {
       evolucion:    buildEvolucion(filtered),
       topItems:     buildTopItems(filtered, 30),
       bcgData:      buildBCGData(records),
-      inflacion:    buildInflacion(records),   // sin filtros — historia completa
+      inflacion:    buildInflacion(records, excludedInflacion),   // sin filtros de período; respeta exclusiones del catálogo
       mix:          buildMix(filtered, metric),
       mixEvolucion: buildMixEvolucion(filtered),
       catalog,

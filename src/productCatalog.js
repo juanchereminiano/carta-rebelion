@@ -6,9 +6,10 @@
  * Clave: id_product (string). Si no hay ID, clave = nombre en mayúsculas.
  *
  * Campos editables:
- *   nombreInforme  → nombre canónico para agrupar en informes
- *   categoria      → texto libre (ej: "CERVEZAS", "COCINA")
- *   mix            → Comida | Bebida | Promos | Mercado | Evento
+ *   nombreInforme      → nombre canónico para agrupar en informes
+ *   categoria          → texto libre (ej: "CERVEZAS", "COCINA")
+ *   mix                → Comida | Bebida | Promos | Mercado | Evento
+ *   excluirInflacion   → boolean (default false) — excluir del análisis de Inflación de Carta
  */
 
 const fs   = require('fs');
@@ -53,10 +54,11 @@ function updateProducts(empresaId, updates) {
     if (!u.id) continue;
     const key = String(u.id);
     if (!catalog[key]) catalog[key] = { id: key };
-    if (u.nombreOriginal !== undefined) catalog[key].nombreOriginal = u.nombreOriginal;
-    if (u.nombreInforme  !== undefined) catalog[key].nombreInforme  = u.nombreInforme;
-    if (u.categoria      !== undefined) catalog[key].categoria      = u.categoria;
-    if (u.mix            !== undefined) catalog[key].mix            = u.mix;
+    if (u.nombreOriginal     !== undefined) catalog[key].nombreOriginal     = u.nombreOriginal;
+    if (u.nombreInforme      !== undefined) catalog[key].nombreInforme      = u.nombreInforme;
+    if (u.categoria          !== undefined) catalog[key].categoria          = u.categoria;
+    if (u.mix                !== undefined) catalog[key].mix                = u.mix;
+    if (u.excluirInflacion   !== undefined) catalog[key].excluirInflacion   = u.excluirInflacion;
   }
   writeCatalog(empresaId, catalog);
   return catalog;
@@ -115,14 +117,15 @@ function buildProductList(empresaId) {
     .map(p => {
       const cat = catalog[p.id] || {};
       return {
-        id:            p.id,
-        nombreOriginal: cat.nombreOriginal || p.nombreOriginal,
-        nombreInforme: cat.nombreInforme  || p.nombreOriginal,
-        categoria:     cat.categoria      || '',
-        mix:           cat.mix            || '',
-        totalVentas:   Math.round(p.totalVentas),
-        meses:         p.meses.size,
-        editado:       !!(cat.nombreInforme || cat.categoria || cat.mix),
+        id:                p.id,
+        nombreOriginal:    cat.nombreOriginal || p.nombreOriginal,
+        nombreInforme:     cat.nombreInforme  || p.nombreOriginal,
+        categoria:         cat.categoria      || '',
+        mix:               cat.mix            || '',
+        excluirInflacion:  cat.excluirInflacion === true,
+        totalVentas:       Math.round(p.totalVentas),
+        meses:             p.meses.size,
+        editado:           !!(cat.nombreInforme || cat.categoria || cat.mix || cat.excluirInflacion),
       };
     })
     .sort((a, b) => b.totalVentas - a.totalVentas);

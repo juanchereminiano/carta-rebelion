@@ -139,23 +139,25 @@ function parseDating(str) {
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /**
- * Filtra chunks anteriores a dataDesde y ajusta el date_init del mes de inicio.
+ * Filtra chunks anteriores a dataDesde.
+ * No modifica date_init — pedimos siempre el mes completo y luego filtramos
+ * a nivel de registro individual con filterByDataDesde().
  * dataDesde: 'YYYY-MM-DD'
  */
 function applyDataDesde(chunks, dataDesde) {
   if (!dataDesde) return chunks;
-  const [dy, dm, dd] = dataDesde.split('-');
+  const [dy, dm] = dataDesde.split('-');
   const desdeYM = `${dy}-${dm}`;  // 'YYYY-MM'
+  return chunks.filter(c => c.yearMonth >= desdeYM);
+}
 
-  return chunks
-    .filter(c => c.yearMonth >= desdeYM)
-    .map(c => {
-      if (c.yearMonth === desdeYM) {
-        // Mes de inicio: ajustar date_init al día exacto de corte
-        return { ...c, date_init: `${dd}.${dm}.${dy}` };
-      }
-      return c;
-    });
+/**
+ * Filtra registros individuales que tengan campo `fecha` (YYYY-MM-DD)
+ * anteriores a dataDesde. Aplicar DESPUÉS de procesar las filas crudas.
+ */
+function filterByDataDesde(records, dataDesde) {
+  if (!dataDesde) return records;
+  return records.filter(r => !r.fecha || r.fecha >= dataDesde);
 }
 
 /**
@@ -175,9 +177,10 @@ function cleanupOldCache(empresaId, dataDesde) {
     // Formato: REPORT-YYYY-MM.json  → extraer YYYY-MM
     const m = file.match(/^\d+-(\d{4}-\d{2})\.json$/);
     if (!m) return;
-    // Borrar si es anterior o igual al mes de inicio (el mes de inicio
-    // se re-descargará con date_init correcto y se guardará de nuevo)
-    if (m[1] <= desdeYM) {
+    // Borrar solo si es ANTERIOR al mes de inicio (no igual).
+    // El mes de inicio se conserva en disco para no perder datos del período
+    // que sí queremos (desde el día exacto hasta fin de mes).
+    if (m[1] < desdeYM) {
       try {
         fs.unlinkSync(path.join(dir, file));
         deleted++;
@@ -403,7 +406,7 @@ async function fetchCartaDataThinkion(empresaId, monthsBack = parseInt(process.e
   }
 
   return {
-    records,
+    records:    filterByDataDesde(records, dataDesde),
     sheetName:  `Thinkion/${empresaId}`,
     allSheets:  [`thinkion-${THINKION_CONFIG[empresaId].code}`],
   };
@@ -485,7 +488,7 @@ async function fetchVentasHorariosThinkion(empresaId, monthsBack = parseInt(proc
     });
   }
 
-  return records;
+  return filterByDataDesde(records, dataDesde);
 }
 
 // ── Ventas por día de negocio (Report 233 con regla de 7am) ──────────────────
@@ -545,7 +548,7 @@ async function fetchVentasDiariasThinkion(empresaId, monthsBack = parseInt(proce
     });
   }
 
-  return records;
+  return filterByDataDesde(records, dataDesde);
 }
 
 // ── Movimientos de Stock (Report 283) ─────────────────────────────────────────

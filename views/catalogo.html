@@ -270,6 +270,40 @@
       padding: 6px 14px;
     }
     .pending-bar.show { display: flex; }
+
+    /* ── Toggle switch (Inflación) ── */
+    .col-inf { width: 80px; text-align: center; }
+    .toggle-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .toggle-inp { display: none; }
+    .toggle-label {
+      position: relative;
+      display: inline-block;
+      width: 36px;
+      height: 20px;
+      background: #cbd5e1;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background .2s;
+      flex-shrink: 0;
+    }
+    .toggle-label::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 14px;
+      height: 14px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform .2s;
+    }
+    .toggle-inp:checked + .toggle-label { background: #059669; }
+    .toggle-inp:checked + .toggle-label::after { transform: translateX(16px); }
+    .toggle-inp.dirty + .toggle-label { outline: 2px solid #fbbf24; border-radius: 20px; }
   </style>
 </head>
 <body>
@@ -336,6 +370,7 @@
               <th class="col-informe">Nombre de Informe ✏️</th>
               <th class="col-cat">Categoría ✏️</th>
               <th class="col-mix">Mix ✏️</th>
+              <th class="col-inf" title="Incluir en el análisis de Inflación de Carta">📈 Inflación</th>
               <th class="col-ventas">Ventas</th>
               <th class="col-meses">Meses</th>
               <th class="col-status"></th>
@@ -422,10 +457,18 @@
     const tbody = document.getElementById('tbody');
     tbody.innerHTML = filtered.map(p => {
       const pend    = pending[p.id] || {};
-      const informe = pend.nombreInforme !== undefined ? pend.nombreInforme : p.nombreInforme;
-      const cat     = pend.categoria     !== undefined ? pend.categoria     : p.categoria;
-      const mix     = pend.mix           !== undefined ? pend.mix           : p.mix;
-      const hasPend = pend.nombreInforme !== undefined || pend.categoria !== undefined || pend.mix !== undefined;
+      const informe = pend.nombreInforme    !== undefined ? pend.nombreInforme    : p.nombreInforme;
+      const cat     = pend.categoria        !== undefined ? pend.categoria        : p.categoria;
+      const mix     = pend.mix              !== undefined ? pend.mix              : p.mix;
+      // excluirInflacion: true = excluido; toggle muestra "incluido" = !excluirInflacion
+      const exclVal = pend.excluirInflacion !== undefined ? pend.excluirInflacion : p.excluirInflacion;
+      const infChecked = !exclVal;   // checkbox checked = incluido en inflación
+      const infDirty   = pend.excluirInflacion !== undefined;
+
+      const hasPend = pend.nombreInforme !== undefined || pend.categoria !== undefined
+                   || pend.mix          !== undefined || pend.excluirInflacion !== undefined;
+
+      const uid = `chk-inf-${p.id.replace(/[^a-z0-9]/gi, '_')}`;
 
       return `
         <tr class="${p.editado || hasPend ? 'edited' : ''}" data-id="${esc(p.id)}">
@@ -450,6 +493,14 @@
               ${MIX_OPTIONS.map(o => `<option value="${o}" ${mix === o ? 'selected' : ''}>${o || '— sin mix —'}</option>`).join('')}
             </select>
           </td>
+          <td class="col-inf">
+            <div class="toggle-wrap" title="${infChecked ? 'Incluido en inflación' : 'Excluido del análisis de inflación'}">
+              <input type="checkbox" class="toggle-inp ${infDirty ? 'dirty' : ''}"
+                     id="${uid}" data-field="excluirInflacion"
+                     ${infChecked ? 'checked' : ''} />
+              <label class="toggle-label" for="${uid}"></label>
+            </div>
+          </td>
           <td class="col-ventas">
             <span class="ventas-fmt">$${fmt(p.totalVentas)}</span>
           </td>
@@ -470,10 +521,44 @@
       document.body.appendChild(dl);
     }
 
-    // Eventos de edición
-    tbody.querySelectorAll('.inline-input').forEach(input => {
+    // Eventos de edición (inputs de texto y selects)
+    tbody.querySelectorAll('.inline-input:not([type="checkbox"])').forEach(input => {
       input.addEventListener('change', onFieldChange);
     });
+    // Toggles de inflación
+    tbody.querySelectorAll('.toggle-inp').forEach(chk => {
+      chk.addEventListener('change', onToggleInflacion);
+    });
+  }
+
+  // ── Toggle inflación ──────────────────────────────────────────────────────
+  function onToggleInflacion(e) {
+    const row      = e.target.closest('tr');
+    const id       = row.dataset.id;
+    const checked  = e.target.checked;           // checked = incluido
+    const newExcluir = !checked;                 // excluirInflacion = !checked
+    const original = allProducts.find(p => p.id === id);
+    const origExcl = original ? !!original.excluirInflacion : false;
+
+    if (newExcluir === origExcl) {
+      // Volvió al original
+      if (pending[id]) {
+        delete pending[id].excluirInflacion;
+        if (!Object.keys(pending[id]).length) delete pending[id];
+      }
+      e.target.classList.remove('dirty');
+    } else {
+      if (!pending[id]) pending[id] = {};
+      pending[id].excluirInflacion = newExcluir;
+      e.target.classList.add('dirty');
+    }
+
+    // Actualizar tooltip dinámico
+    e.target.closest('.toggle-wrap').title = checked
+      ? 'Incluido en inflación'
+      : 'Excluido del análisis de inflación';
+
+    updatePendingUI();
   }
 
   // ── Edición inline ────────────────────────────────────────────────────────
@@ -530,9 +615,10 @@
       updates.forEach(u => {
         const p = allProducts.find(x => x.id === u.id);
         if (!p) return;
-        if (u.nombreInforme !== undefined) p.nombreInforme = u.nombreInforme;
-        if (u.categoria     !== undefined) p.categoria     = u.categoria;
-        if (u.mix           !== undefined) p.mix           = u.mix;
+        if (u.nombreInforme    !== undefined) p.nombreInforme    = u.nombreInforme;
+        if (u.categoria        !== undefined) p.categoria        = u.categoria;
+        if (u.mix              !== undefined) p.mix              = u.mix;
+        if (u.excluirInflacion !== undefined) p.excluirInflacion = u.excluirInflacion;
         p.editado = true;
       });
 

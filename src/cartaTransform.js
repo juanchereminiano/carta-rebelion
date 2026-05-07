@@ -312,17 +312,23 @@ function buildBCGData(records) {
 // Lo mismo aplica para YoY (vs. mismo mes año anterior) y acumulado del año
 // (vs. primer mes del mismo año en la base).
 // Usa TODOS los registros sin filtrar.
+// excludedProducts: Set de nombres de producto a excluir del análisis (campo excluirInflacion del catálogo).
 //
-function buildInflacion(records) {
-  const EMPTY = { labels: [], avgPrices: [], mom: [], yoy: [], cumAnual: [], annual: [], totalCum: null, months: [] };
+function buildInflacion(records, excludedProducts = new Set()) {
+  const EMPTY = { labels: [], avgPrices: [], mom: [], yoy: [], cumAnual: [], annual: [], totalCum: null, months: [], excludedCount: 0 };
 
   // ── 1. Agrupar por producto + mesKey ────────────────────────────────────
   // prodData[producto][mesKey] = { ventas, cant }
   const prodData  = {};
   const keyMeta   = {};   // mesKey → { ano, mes }
+  let excludedCount = 0;
 
   for (const r of records) {
     if (!r.ano || !r.mes || !r.producto) continue;
+    if (excludedProducts.size > 0 && excludedProducts.has(r.producto)) {
+      excludedCount++;
+      continue;
+    }
     const dinero = r.dinero || 0;
     const cant   = r.cant   || 0;
     if (cant <= 0 || dinero <= 0) continue;
@@ -455,13 +461,14 @@ function buildInflacion(records) {
   const round1 = n => n != null ? parseFloat(n.toFixed(1)) : null;
 
   return {
-    labels:    months.map(m => `${m.mes.slice(0, 3)} ${m.ano}`),
-    avgPrices: months.map(m => m.avgPrice),
-    mom:       months.map(m => round1(m.mom)),
-    yoy:       months.map(m => round1(m.yoy)),
-    cumAnual:  months.map(m => round1(m.cumAnual)),
+    labels:       months.map(m => `${m.mes.slice(0, 3)} ${m.ano}`),
+    avgPrices:    months.map(m => m.avgPrice),
+    mom:          months.map(m => round1(m.mom)),
+    yoy:          months.map(m => round1(m.yoy)),
+    cumAnual:     months.map(m => round1(m.cumAnual)),
     annual,
     totalCum,
+    excludedCount,
     firstLabel: `${months[0].mes.slice(0,3)} ${months[0].ano}`,
     lastLabel:  `${months[months.length-1].mes.slice(0,3)} ${months[months.length-1].ano}`,
     months: months.map(m => ({
