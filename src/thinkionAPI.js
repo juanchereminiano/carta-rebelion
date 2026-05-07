@@ -68,6 +68,7 @@ const THINKION_CONFIG = {
     token:          process.env.THINKION_TOKEN_TRENQUECRAFT
                     || '704575c0114c0ae51104b4712666e899-2b213d42f927c611d1c80fb871198384-4b882b11452f812b4b6dc5f5b0397c54',
     establishments: [1],
+    dataDesde:      '2022-11-24',  // Solo datos desde esta fecha (inicio de operación real)
   },
   temple: {
     code:           'tem9',
@@ -136,6 +137,57 @@ function parseDating(str) {
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/**
+ * Filtra chunks anteriores a dataDesde y ajusta el date_init del mes de inicio.
+ * dataDesde: 'YYYY-MM-DD'
+ */
+function applyDataDesde(chunks, dataDesde) {
+  if (!dataDesde) return chunks;
+  const [dy, dm, dd] = dataDesde.split('-');
+  const desdeYM = `${dy}-${dm}`;  // 'YYYY-MM'
+
+  return chunks
+    .filter(c => c.yearMonth >= desdeYM)
+    .map(c => {
+      if (c.yearMonth === desdeYM) {
+        // Mes de inicio: ajustar date_init al día exacto de corte
+        return { ...c, date_init: `${dd}.${dm}.${dy}` };
+      }
+      return c;
+    });
+}
+
+/**
+ * Borra archivos de caché de una empresa que sean anteriores a dataDesde.
+ * También borra el mes de inicio para que se re-descargue desde el día correcto.
+ * Se llama al arrancar el servidor para limpiar Railway.
+ */
+function cleanupOldCache(empresaId, dataDesde) {
+  if (!dataDesde) return;
+  const [dy, dm] = dataDesde.split('-');
+  const desdeYM  = `${dy}-${dm}`;  // 'YYYY-MM'
+  const dir      = path.join(DATA_DIR, empresaId);
+  if (!fs.existsSync(dir)) return;
+
+  let deleted = 0;
+  fs.readdirSync(dir).forEach(file => {
+    // Formato: REPORT-YYYY-MM.json  → extraer YYYY-MM
+    const m = file.match(/^\d+-(\d{4}-\d{2})\.json$/);
+    if (!m) return;
+    // Borrar si es anterior o igual al mes de inicio (el mes de inicio
+    // se re-descargará con date_init correcto y se guardará de nuevo)
+    if (m[1] <= desdeYM) {
+      try {
+        fs.unlinkSync(path.join(dir, file));
+        deleted++;
+      } catch {}
+    }
+  });
+  if (deleted > 0) {
+    console.log(`[Cache] ${empresaId}: ${deleted} archivo(s) eliminado(s) anteriores a ${dataDesde}`);
+  }
+}
 
 // ── HTTP helper ───────────────────────────────────────────────────────────────
 function httpPost(url, token, payload) {
@@ -264,8 +316,8 @@ async function fetchCartaDataThinkion(empresaId, monthsBack = parseInt(process.e
   const cfg = THINKION_CONFIG[empresaId];
   if (!cfg) throw new Error(`Empresa "${empresaId}" no tiene config Thinkion`);
 
-  const { code, token, establishments } = cfg;
-  const chunks = monthChunks(monthsBack);
+  const { code, token, establishments, dataDesde } = cfg;
+  const chunks = applyDataDesde(monthChunks(monthsBack), dataDesde);
 
   // ── Catálogo maestro de productos (prioridad máxima) ─────────────────────
   const catalog    = readCatalog(empresaId);
@@ -376,8 +428,8 @@ async function fetchVentasHorariosThinkion(empresaId, monthsBack = parseInt(proc
   const cfg = THINKION_CONFIG[empresaId];
   if (!cfg) throw new Error(`Empresa "${empresaId}" no tiene config Thinkion`);
 
-  const { code, token, establishments } = cfg;
-  const chunks = monthChunks(monthsBack);
+  const { code, token, establishments, dataDesde } = cfg;
+  const chunks = applyDataDesde(monthChunks(monthsBack), dataDesde);
 
   // Report 233: una fila = una venta/orden completa
   // Usa TOTAL (no payment) → incluye descuentos correctamente
@@ -445,8 +497,8 @@ async function fetchVentasDiariasThinkion(empresaId, monthsBack = parseInt(proce
   const cfg = THINKION_CONFIG[empresaId];
   if (!cfg) throw new Error(`Empresa "${empresaId}" no tiene config Thinkion`);
 
-  const { code, token, establishments } = cfg;
-  const chunks = monthChunks(monthsBack);
+  const { code, token, establishments, dataDesde } = cfg;
+  const chunks = applyDataDesde(monthChunks(monthsBack), dataDesde);
 
   // Comparte el caché de disco de R233 con fetchVentasHorariosThinkion
   const allRows = [];
@@ -594,6 +646,7 @@ module.exports = {
   fetchVentasDiariasThinkion,
   fetchMovimientosStock,
   reporteProductosSinCategoria,
+  cleanupOldCache,
   THINKION_CONFIG,
   _thinkionRequestRaw: thinkionRequest,
 };

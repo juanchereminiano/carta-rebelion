@@ -28,6 +28,7 @@ const {
   fetchVentasDiariasThinkion,
   fetchMovimientosStock,
   reporteProductosSinCategoria,
+  cleanupOldCache,
   THINKION_CONFIG,
 } = require('./src/thinkionAPI');
 const { readCatalog, updateProducts, buildProductList } = require('./src/productCatalog');
@@ -754,6 +755,11 @@ async function refreshCaches() {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Carta Rebelión corriendo en http://localhost:${PORT}`);
+
+  // 0. Limpiar caché viejo de empresas con dataDesde configurado (ej: trenquecraft)
+  for (const [empresaId, cfg] of Object.entries(THINKION_CONFIG)) {
+    if (cfg.dataDesde) cleanupOldCache(empresaId, cfg.dataDesde);
+  }
 
   // 1. Warmup al arrancar: llena memoria + disco
   warmupCaches().catch(err => console.error('[Warmup] Error general:', err.message));
