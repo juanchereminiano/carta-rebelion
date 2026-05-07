@@ -158,16 +158,42 @@
       <div id="ms-mes"  class="ms-wrap"></div>
     </div>
 
-    <!-- Modo RANGO: desde / hasta -->
+    <!-- Modo RANGO: desde / hasta (selects de mes + año) -->
     <div id="ms-rango-wrap" class="date-range-wrap" style="display:none">
       <div class="date-range-field">
         <label class="date-range-label">Desde</label>
-        <input type="month" id="filter-desde" class="date-range-input" />
+        <div class="date-range-selects">
+          <select id="filter-desde-mes" class="date-range-select">
+            <option value="">Mes</option>
+            <option value="01">Ene</option><option value="02">Feb</option>
+            <option value="03">Mar</option><option value="04">Abr</option>
+            <option value="05">May</option><option value="06">Jun</option>
+            <option value="07">Jul</option><option value="08">Ago</option>
+            <option value="09">Sep</option><option value="10">Oct</option>
+            <option value="11">Nov</option><option value="12">Dic</option>
+          </select>
+          <select id="filter-desde-ano" class="date-range-select" style="width:80px">
+            <option value="">Año</option>
+          </select>
+        </div>
       </div>
       <div class="date-range-sep">—</div>
       <div class="date-range-field">
         <label class="date-range-label">Hasta</label>
-        <input type="month" id="filter-hasta" class="date-range-input" />
+        <div class="date-range-selects">
+          <select id="filter-hasta-mes" class="date-range-select">
+            <option value="">Mes</option>
+            <option value="01">Ene</option><option value="02">Feb</option>
+            <option value="03">Mar</option><option value="04">Abr</option>
+            <option value="05">May</option><option value="06">Jun</option>
+            <option value="07">Jul</option><option value="08">Ago</option>
+            <option value="09">Sep</option><option value="10">Oct</option>
+            <option value="11">Nov</option><option value="12">Dic</option>
+          </select>
+          <select id="filter-hasta-ano" class="date-range-select" style="width:80px">
+            <option value="">Año</option>
+          </select>
+        </div>
       </div>
       <button id="btn-rango-clear" class="date-range-clear" title="Limpiar rango">✕</button>
     </div>

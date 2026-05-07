@@ -912,31 +912,91 @@ function initFilterModeToggle() {
   const btnRango    = document.getElementById('mode-rango');
   const wrapPeriodo = document.getElementById('ms-periodo-wrap');
   const wrapRango   = document.getElementById('ms-rango-wrap');
-  const inputDesde  = document.getElementById('filter-desde');
-  const inputHasta  = document.getElementById('filter-hasta');
+  const selDesdeMes = document.getElementById('filter-desde-mes');
+  const selDesdeAno = document.getElementById('filter-desde-ano');
+  const selHastaMes = document.getElementById('filter-hasta-mes');
+  const selHastaAno = document.getElementById('filter-hasta-ano');
   const btnClear    = document.getElementById('btn-rango-clear');
 
-  // Mes actual como límite máximo (no permitir fechas futuras)
-  const now = new Date();
-  const maxMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  inputDesde.max = maxMonth;
-  inputHasta.max = maxMonth;
+  // Rango de años disponibles: desde 2020 hasta el año actual
+  const now     = new Date();
+  const curYear = now.getFullYear();
+  const curMes  = now.getMonth() + 1; // 1-12
 
-  // Defaults cuando se activa el modo Rango por primera vez:
-  // Hasta = mes actual, Desde = vacío (sin límite inferior → ver todo el historial)
-  function applyRangoDefaults() {
-    if (!state.hasta) {
-      state.hasta      = maxMonth;
-      inputHasta.value = maxMonth;
+  // Rellenar opciones de año en ambos selects
+  for (const sel of [selDesdeAno, selHastaAno]) {
+    for (let y = curYear; y >= 2020; y--) {
+      const opt = document.createElement('option');
+      opt.value = String(y);
+      opt.textContent = String(y);
+      sel.appendChild(opt);
     }
   }
 
-  // Sincroniza min de "Hasta" con el valor de "Desde" y viceversa
-  function syncConstraints() {
-    if (state.desde) inputHasta.min = state.desde;
-    if (state.hasta) inputDesde.max = state.hasta;
-    else             inputDesde.max = maxMonth;
+  // Lee los selects y devuelve 'YYYY-MM' o '' si incompleto
+  function readDesde() {
+    const m = selDesdeMes.value, a = selDesdeAno.value;
+    return (m && a) ? `${a}-${m}` : '';
   }
+  function readHasta() {
+    const m = selHastaMes.value, a = selHastaAno.value;
+    return (m && a) ? `${a}-${m}` : '';
+  }
+
+  // Escribe un valor 'YYYY-MM' en los selects correspondientes
+  function writeDesde(ym) {
+    if (!ym) { selDesdeMes.value = ''; selDesdeAno.value = ''; return; }
+    const [y, m] = ym.split('-');
+    selDesdeAno.value = y; selDesdeMes.value = m;
+  }
+  function writeHasta(ym) {
+    if (!ym) { selHastaMes.value = ''; selHastaAno.value = ''; return; }
+    const [y, m] = ym.split('-');
+    selHastaAno.value = y; selHastaMes.value = m;
+  }
+
+  // Default: Hasta = mes actual, Desde = vacío (todo el historial)
+  function applyRangoDefaults() {
+    if (!state.hasta) {
+      const mm = String(curMes).padStart(2, '0');
+      state.hasta = `${curYear}-${mm}`;
+    }
+    writeHasta(state.hasta);
+    writeDesde(state.desde);
+  }
+
+  // Valida que desde <= hasta y que ninguno sea futuro
+  function clampFuture(ym) {
+    const maxYM = `${curYear}-${String(curMes).padStart(2,'0')}`;
+    return ym > maxYM ? maxYM : ym;
+  }
+
+  function onDesdeChange() {
+    let desde = readDesde();
+    if (desde) desde = clampFuture(desde);
+    // Si desde > hasta, ajustar hasta
+    let hasta = readHasta();
+    if (hasta && desde && desde > hasta) { hasta = desde; writeHasta(hasta); }
+    state.desde = desde;
+    state.hasta = hasta || state.hasta;
+    updateFilterBadge();
+    if (desde) loadData();
+  }
+
+  function onHastaChange() {
+    let hasta = readHasta();
+    if (hasta) hasta = clampFuture(hasta);
+    // Si hasta < desde, ajustar desde
+    let desde = readDesde();
+    if (desde && hasta && hasta < desde) { desde = hasta; writeDesde(desde); }
+    state.hasta = hasta;
+    state.desde = desde || state.desde;
+    updateFilterBadge();
+    if (hasta) loadData();
+  }
+
+  for (const sel of [selDesdeMes, selDesdeAno]) sel.addEventListener('change', onDesdeChange);
+  for (const sel of [selHastaMes, selHastaAno]) sel.addEventListener('change', onHastaChange);
 
   function setMode(mode) {
     state.filterMode = mode;
@@ -946,40 +1006,19 @@ function initFilterModeToggle() {
     wrapPeriodo.style.display = isRango ? 'none' : '';
     wrapRango.style.display   = isRango ? ''     : 'none';
     if (isRango) applyRangoDefaults();
-    syncConstraints();
     updateFilterBadge();
     loadData();
   }
 
-  btnPeriodo.addEventListener('click', () => {
-    if (state.filterMode === 'periodo') return;
-    setMode('periodo');
-  });
-  btnRango.addEventListener('click', () => {
-    if (state.filterMode === 'rango') return;
-    setMode('rango');
-  });
-
-  inputDesde.addEventListener('change', () => {
-    state.desde = inputDesde.value;
-    syncConstraints();
-    updateFilterBadge();
-    loadData();
-  });
-  inputHasta.addEventListener('change', () => {
-    state.hasta = inputHasta.value;
-    syncConstraints();
-    updateFilterBadge();
-    loadData();
-  });
+  btnPeriodo.addEventListener('click', () => { if (state.filterMode !== 'periodo') setMode('periodo'); });
+  btnRango.addEventListener('click',   () => { if (state.filterMode !== 'rango')   setMode('rango');   });
 
   btnClear.addEventListener('click', () => {
-    state.desde      = '';
-    state.hasta      = maxMonth;
-    inputDesde.value = '';
-    inputHasta.value = maxMonth;
-    inputHasta.min   = '';
-    inputDesde.max   = maxMonth;
+    const mm = String(curMes).padStart(2,'0');
+    state.desde = '';
+    state.hasta = `${curYear}-${mm}`;
+    writeDesde('');
+    writeHasta(state.hasta);
     updateFilterBadge();
     loadData();
   });

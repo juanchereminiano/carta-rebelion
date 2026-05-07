@@ -1399,6 +1399,24 @@ body {
   color: var(--muted);
   margin-top: 14px;
 }
+.date-range-selects {
+  display: flex;
+  gap: 4px;
+}
+.date-range-select {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.82rem;
+  padding: 5px 6px;
+  cursor: pointer;
+  outline: none;
+  height: 32px;
+}
+.date-range-select:focus {
+  border-color: var(--accent);
+}
 .date-range-clear {
   background: none;
   border: 1px solid var(--border);
