@@ -436,13 +436,11 @@ async function fetchVentasHorariosThinkion(empresaId, monthsBack = parseInt(proc
   return records;
 }
 
-// ── Ventas por día de negocio (Report 234) ────────────────────────────────────
-// R234 = igual que R233 pero la fecha ya está asignada al día de negocio correcto.
-// Una venta a las 00:30 aparece en el día anterior (turno de noche de ese día),
-// no en el día calendario real. Ideal para KPIs y tablas de ventas diarias.
-//
-// Estructura esperada: igual a R233 — una fila = una orden completa.
-// Diferencia clave: date_init refleja la fecha de negocio, no el datetime exacto.
+// ── Ventas por día de negocio (Report 233 con regla de 7am) ──────────────────
+// Usa el mismo R233 que Turnos & Horarios (comparte caché de disco).
+// Aplica la regla de negocio gastronómica:
+//   → Órdenes entre 07:00 y 06:59 del día siguiente = mismo día de negocio.
+//   → Una venta a las 00:30 del martes pertenece al LUNES (día de negocio).
 async function fetchVentasDiariasThinkion(empresaId, monthsBack = parseInt(process.env.THINKION_MONTHS_BACK) || 60) {
   const cfg = THINKION_CONFIG[empresaId];
   if (!cfg) throw new Error(`Empresa "${empresaId}" no tiene config Thinkion`);
@@ -450,50 +448,48 @@ async function fetchVentasDiariasThinkion(empresaId, monthsBack = parseInt(proce
   const { code, token, establishments } = cfg;
   const chunks = monthChunks(monthsBack);
 
+  // Comparte el caché de disco de R233 con fetchVentasHorariosThinkion
   const allRows = [];
   for (const chunk of chunks) {
-    const { rows, fromApi } = await fetchChunkCached(empresaId, 234, chunk, () =>
+    const { rows, fromApi } = await fetchChunkCached(empresaId, 233, chunk, () =>
       thinkionRequest(code, token, {
-        id_report:      234,
+        id_report:      233,
         date_init:      chunk.date_init,
         date_end:       chunk.date_end,
         establishments,
       })
     );
-    // Log primeras filas del primer chunk fresco para verificar estructura
-    if (fromApi && allRows.length === 0 && rows.length > 0) {
-      console.log(`[Thinkion/${empresaId}] R234 muestra:`, JSON.stringify(rows[0]));
-    }
     allRows.push(...rows);
     if (fromApi) await sleep(800);
   }
 
-  console.log(`[Thinkion/${empresaId}] Total ventas diarias (R234): ${allRows.length} filas`);
+  console.log(`[Thinkion/${empresaId}] Total ventas diarias (R233+regla7am): ${allRows.length} órdenes`);
 
-  // R234: una fila = un día de negocio (fecha ya corregida para turnos de madrugada)
-  // Campos confirmados: date_init "DD.MM.YYYY", payment, totalpayment
   const records = [];
   for (const row of allRows) {
-    // date_init es solo fecha "DD.MM.YYYY" (sin hora)
-    const parsed = parseDating(row.date_init);
+    const parsed = parseDatetime(row.date_init);
     if (!parsed) continue;
-    const { year, month1, day } = parsed;
+    const { year, month1, day, hour } = parsed;
 
-    // payment = importe del día de negocio completo
-    const venta = parseFloat(row.payment || row.totalpayment || '0') || 0;
+    const venta = parseFloat(row.total) || 0;
     if (!venta) continue;
 
-    const fecha     = `${year}-${String(month1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    const mesNombre = MES_NOMBRES[month1 - 1] || 'ENERO';
+    // ── Regla de día de negocio: hora < 7 → pertenece al día anterior ────────
+    const bdDate = new Date(year, month1 - 1, day);
+    if (hour < 7) bdDate.setDate(bdDate.getDate() - 1);
+
+    const bdYear   = bdDate.getFullYear();
+    const bdMonth1 = bdDate.getMonth() + 1;
+    const bdDay    = bdDate.getDate();
 
     records.push({
-      fecha,
-      año:      year,
-      mes:      month1,
-      mesNombre,
+      fecha:     `${bdYear}-${String(bdMonth1).padStart(2,'0')}-${String(bdDay).padStart(2,'0')}`,
+      año:       bdYear,
+      mes:       bdMonth1,
+      mesNombre: MES_NOMBRES[bdMonth1 - 1] || 'ENERO',
       venta,
-      // R234 no tiene conteo de órdenes ni tipo de ticket — es un resumen diario
-      orden:    0,
+      orden:     1,
+      tipoTicket: (row.ticket_last || row.ticket_type || '').toUpperCase(),
     });
   }
 

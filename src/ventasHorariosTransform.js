@@ -314,26 +314,22 @@ function buildVentasResumen(records, { desde, hasta, anos, meses } = {}) {
     return true;
   });
 
-  // R234: orden=0 por fila (resumen diario), R233: orden=1 por fila (orden individual)
-  const diasOperados = filtered.length;
-  const totalOrdenes = filtered.reduce((s, r) => s + (r.orden || 0), 0);
+  // R233 con regla 7am: una fila = una orden, fecha ya corregida al día de negocio
+  const totalOrdenes = filtered.length;
   const totalVentas  = filtered.reduce((s, r) => s + (r.venta || 0), 0);
-  const esResumenDiario = totalOrdenes === 0;   // true cuando viene de R234
 
-  // Facturación: solo disponible cuando hay tipoTicket (R233)
-  const facturacion = { fiscal: 0, noFiscal: 0, fiscalOrdenes: 0, noFiscalOrdenes: 0, disponible: !esResumenDiario };
-  if (!esResumenDiario) {
-    filtered.forEach(r => {
-      const t = (r.tipoTicket || '').toUpperCase();
-      if (t === 'DESPACHO' || t === 'D') {
-        facturacion.noFiscal += r.venta || 0;
-        facturacion.noFiscalOrdenes++;
-      } else {
-        facturacion.fiscal += r.venta || 0;
-        facturacion.fiscalOrdenes++;
-      }
-    });
-  }
+  // Facturación: DESPACHO = no fiscal, A/B = fiscal
+  const facturacion = { fiscal: 0, noFiscal: 0, fiscalOrdenes: 0, noFiscalOrdenes: 0 };
+  filtered.forEach(r => {
+    const t = (r.tipoTicket || '').toUpperCase();
+    if (t === 'DESPACHO' || t === 'D') {
+      facturacion.noFiscal += r.venta || 0;
+      facturacion.noFiscalOrdenes++;
+    } else {
+      facturacion.fiscal += r.venta || 0;
+      facturacion.fiscalOrdenes++;
+    }
+  });
 
   // Tabla año × mes
   const tableMap = {};   // año → { mes: { ventas, ordenes } }
@@ -418,8 +414,6 @@ function buildVentasResumen(records, { desde, hasta, anos, meses } = {}) {
 
   return {
     totalOrdenes,
-    diasOperados,
-    esResumenDiario,
     totalVentas,
     facturacion,
     tabla: { meses: MES_ORDER, rows },
