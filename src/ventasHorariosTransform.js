@@ -292,19 +292,21 @@ function buildCatalog(records) {
 // records: array completo de R233 (ya procesado por fetchVentasHorariosThinkion)
 // filters: { desde, hasta, anos, meses }  — mismo formato que /api/carta
 function buildVentasResumen(records, { desde, hasta, anos, meses } = {}) {
-  const fromKey = desde || null;  // 'YYYY-MM'
-  const toKey   = hasta || null;
+  // desde / hasta pueden ser 'YYYY-MM-DD' (rango por día) o 'YYYY-MM' (período mensual).
+  // R233 tiene r.fecha = 'YYYY-MM-DD', así que comparamos directamente.
+  const fromDate = desde || null;
+  const toDate   = hasta || null;
 
-  const anosArr  = (fromKey || toKey) ? null
+  const anosArr  = (fromDate || toDate) ? null
     : (anos  && !anos.includes('all')  ? anos.map(String) : null);
-  const mesesArr = (fromKey || toKey) ? null
+  const mesesArr = (fromDate || toDate) ? null
     : (meses && !meses.includes('all') ? meses.map(m => m.toUpperCase()) : null);
 
   const filtered = records.filter(r => {
-    if (fromKey || toKey) {
-      const rKey = `${r.año}-${String(r.mes).padStart(2, '0')}`;
-      if (fromKey && rKey < fromKey) return false;
-      if (toKey   && rKey > toKey)   return false;
+    if (fromDate || toDate) {
+      // r.fecha es 'YYYY-MM-DD'; comparación lexicográfica es correcta
+      if (fromDate && r.fecha < fromDate) return false;
+      if (toDate   && r.fecha > toDate)   return false;
     } else {
       if (anosArr  && !anosArr.includes(String(r.año)))    return false;
       if (mesesArr && !mesesArr.includes(r.mesNombre))     return false;

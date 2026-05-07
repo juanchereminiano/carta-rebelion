@@ -16,13 +16,15 @@ const CAT_COLORS = [
 // Soporta:
 //   - arrays  : anos/meses/categorias/productos/mixes  (MultiSelect del topbar)
 //   - strings : ano/mes  (legacy, params individuales)
-//   - rango   : desde/hasta  formato "YYYY-MM" — si está presente, reemplaza anos/meses
+//   - rango   : desde/hasta  formato "YYYY-MM-DD" o "YYYY-MM" — reemplaza anos/meses
 function filterRecords(records, filters = {}) {
   const { anos, meses, categorias, productos, mixes, ano, mes, desde, hasta } = filters;
 
   // ── Rango personalizado ─────────────────────────────────────────────────────
-  const fromKey = desde || null;   // "YYYY-MM" o null
-  const toKey   = hasta || null;
+  // desde/hasta pueden venir como 'YYYY-MM-DD' (rango por día) o 'YYYY-MM'.
+  // R320 solo tiene año+mes, así que tomamos los primeros 7 caracteres para comparar.
+  const fromKey = desde ? desde.slice(0, 7) : null;   // "YYYY-MM" o null
+  const toKey   = hasta ? hasta.slice(0, 7) : null;
 
   // ── Filtros de período (solo cuando NO hay rango) ───────────────────────────
   const anosArr = (fromKey || toKey) ? null
