@@ -1066,43 +1066,69 @@ function canvasGradient(canvasId, stops) {
 
 // ── DASHBOARD ──────────────────────────────────────────────────────────────
 
-// ── KPIs Ventas Reales (R233) ──────────────────────────────────────────────
+// ── KPIs Ventas (R234 = resumen diario / R233 = órdenes individuales) ──────────
 function renderVentasKPIs(v) {
   if (!v) return;
   const fNum = n => n == null ? '—' : Math.round(n).toLocaleString('es-AR');
   const fPct = (a, t) => t > 0 ? (a/t*100).toFixed(1)+'%' : '—';
 
-  const ticket      = v.totalOrdenes > 0 ? Math.round(v.totalVentas / v.totalOrdenes) : null;
-  const fiscalPct   = fPct(v.facturacion.fiscal,   v.totalVentas);
-  const noFiscalPct = fPct(v.facturacion.noFiscal, v.totalVentas);
+  let cards = '';
 
-  document.getElementById('ventas-grid').innerHTML = `
-    <div class="summary-card">
-      <div class="s-label">Órdenes</div>
-      <div class="s-value">${fNum(v.totalOrdenes)}</div>
-      <div class="s-sub">total del período</div>
-    </div>
-    <div class="summary-card">
-      <div class="s-label">Importe total</div>
-      <div class="s-value">${fmt.pesosFull(v.totalVentas)}</div>
-      <div class="s-sub">ventas del período</div>
-    </div>
-    <div class="summary-card">
-      <div class="s-label">Ticket promedio</div>
-      <div class="s-value">${fmt.pesosFull(ticket)}</div>
-      <div class="s-sub">por orden</div>
-    </div>
-    <div class="summary-card">
-      <div class="s-label">Fiscal (A / B)</div>
-      <div class="s-value">${fmt.pesosFull(v.facturacion.fiscal)}</div>
-      <div class="s-sub">${fiscalPct} · ${fNum(v.facturacion.fiscalOrdenes)} órdenes</div>
-    </div>
-    <div class="summary-card">
-      <div class="s-label">No Fiscal (Despacho)</div>
-      <div class="s-value">${fmt.pesosFull(v.facturacion.noFiscal)}</div>
-      <div class="s-sub">${noFiscalPct} · ${fNum(v.facturacion.noFiscalOrdenes)} órdenes</div>
-    </div>
-  `;
+  if (v.esResumenDiario) {
+    // R234: una fila = un día de negocio → mostramos días y promedio diario
+    const promDia = v.diasOperados > 0 ? Math.round(v.totalVentas / v.diasOperados) : null;
+    cards = `
+      <div class="summary-card">
+        <div class="s-label">Días operados</div>
+        <div class="s-value">${fNum(v.diasOperados)}</div>
+        <div class="s-sub">días de negocio en el período</div>
+      </div>
+      <div class="summary-card">
+        <div class="s-label">Importe total</div>
+        <div class="s-value">${fmt.pesosFull(v.totalVentas)}</div>
+        <div class="s-sub">ventas del período</div>
+      </div>
+      <div class="summary-card">
+        <div class="s-label">Promedio por día</div>
+        <div class="s-value">${fmt.pesosFull(promDia)}</div>
+        <div class="s-sub">facturación diaria promedio</div>
+      </div>
+    `;
+  } else {
+    // R233: una fila = una orden → mostramos órdenes, ticket y fiscal
+    const ticket      = v.totalOrdenes > 0 ? Math.round(v.totalVentas / v.totalOrdenes) : null;
+    const fiscalPct   = fPct(v.facturacion.fiscal,   v.totalVentas);
+    const noFiscalPct = fPct(v.facturacion.noFiscal, v.totalVentas);
+    cards = `
+      <div class="summary-card">
+        <div class="s-label">Órdenes</div>
+        <div class="s-value">${fNum(v.totalOrdenes)}</div>
+        <div class="s-sub">total del período</div>
+      </div>
+      <div class="summary-card">
+        <div class="s-label">Importe total</div>
+        <div class="s-value">${fmt.pesosFull(v.totalVentas)}</div>
+        <div class="s-sub">ventas del período</div>
+      </div>
+      <div class="summary-card">
+        <div class="s-label">Ticket promedio</div>
+        <div class="s-value">${fmt.pesosFull(ticket)}</div>
+        <div class="s-sub">por orden</div>
+      </div>
+      <div class="summary-card">
+        <div class="s-label">Fiscal (A / B)</div>
+        <div class="s-value">${fmt.pesosFull(v.facturacion.fiscal)}</div>
+        <div class="s-sub">${fiscalPct} · ${fNum(v.facturacion.fiscalOrdenes)} órdenes</div>
+      </div>
+      <div class="summary-card">
+        <div class="s-label">No Fiscal (Despacho)</div>
+        <div class="s-value">${fmt.pesosFull(v.facturacion.noFiscal)}</div>
+        <div class="s-sub">${noFiscalPct} · ${fNum(v.facturacion.noFiscalOrdenes)} órdenes</div>
+      </div>
+    `;
+  }
+
+  document.getElementById('ventas-grid').innerHTML = cards;
 }
 
 // ── Tabla año × mes (R233) ─────────────────────────────────────────────────
@@ -1114,6 +1140,17 @@ function renderVentasTabla(v, metric) {
     return;
   }
   document.getElementById('ventas-tabla-card').style.display = '';
+
+  // El toggle "Ticket prom." solo aplica cuando hay datos de órdenes (R233)
+  const ticketBtn = document.getElementById('vtab-metric-ticket');
+  if (ticketBtn) ticketBtn.style.display = v.esResumenDiario ? 'none' : '';
+  // Si estaba activo ticket pero ahora no está disponible, resetear a ventas
+  if (v.esResumenDiario && metric === 'ticket') {
+    metric = 'ventas';
+    vtabMetric = 'ventas';
+    document.getElementById('vtab-metric-ventas').classList.add('active');
+    document.getElementById('vtab-metric-ticket').classList.remove('active');
+  }
 
   const MES_ORDER_FULL = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO',
                           'JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];

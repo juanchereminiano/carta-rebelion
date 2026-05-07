@@ -470,14 +470,17 @@ async function fetchVentasDiariasThinkion(empresaId, monthsBack = parseInt(proce
 
   console.log(`[Thinkion/${empresaId}] Total ventas diarias (R234): ${allRows.length} filas`);
 
+  // R234: una fila = un día de negocio (fecha ya corregida para turnos de madrugada)
+  // Campos confirmados: date_init "DD.MM.YYYY", payment, totalpayment
   const records = [];
   for (const row of allRows) {
-    // date_init puede ser "DD.MM.YYYY HH:MM" o "DD.MM.YYYY" — parseamos ambos
-    const parsed = parseDatetime(row.date_init) || parseDating(row.date_init) || parseDating(row.dating);
+    // date_init es solo fecha "DD.MM.YYYY" (sin hora)
+    const parsed = parseDating(row.date_init);
     if (!parsed) continue;
     const { year, month1, day } = parsed;
 
-    const venta = parseFloat(row.total || row.sale || row.amount || '0') || 0;
+    // payment = importe del día de negocio completo
+    const venta = parseFloat(row.payment || row.totalpayment || '0') || 0;
     if (!venta) continue;
 
     const fecha     = `${year}-${String(month1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
@@ -485,12 +488,12 @@ async function fetchVentasDiariasThinkion(empresaId, monthsBack = parseInt(proce
 
     records.push({
       fecha,
-      año:        year,
-      mes:        month1,
+      año:      year,
+      mes:      month1,
       mesNombre,
       venta,
-      orden:      1,
-      tipoTicket: (row.ticket_last || row.ticket_type || row.tipo_ticket || row.type || '').toUpperCase(),
+      // R234 no tiene conteo de órdenes ni tipo de ticket — es un resumen diario
+      orden:    0,
     });
   }
 
