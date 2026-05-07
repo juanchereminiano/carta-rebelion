@@ -436,6 +436,67 @@ async function fetchVentasHorariosThinkion(empresaId, monthsBack = parseInt(proc
   return records;
 }
 
+// ── Ventas por día de negocio (Report 234) ────────────────────────────────────
+// R234 = igual que R233 pero la fecha ya está asignada al día de negocio correcto.
+// Una venta a las 00:30 aparece en el día anterior (turno de noche de ese día),
+// no en el día calendario real. Ideal para KPIs y tablas de ventas diarias.
+//
+// Estructura esperada: igual a R233 — una fila = una orden completa.
+// Diferencia clave: date_init refleja la fecha de negocio, no el datetime exacto.
+async function fetchVentasDiariasThinkion(empresaId, monthsBack = parseInt(process.env.THINKION_MONTHS_BACK) || 60) {
+  const cfg = THINKION_CONFIG[empresaId];
+  if (!cfg) throw new Error(`Empresa "${empresaId}" no tiene config Thinkion`);
+
+  const { code, token, establishments } = cfg;
+  const chunks = monthChunks(monthsBack);
+
+  const allRows = [];
+  for (const chunk of chunks) {
+    const { rows, fromApi } = await fetchChunkCached(empresaId, 234, chunk, () =>
+      thinkionRequest(code, token, {
+        id_report:      234,
+        date_init:      chunk.date_init,
+        date_end:       chunk.date_end,
+        establishments,
+      })
+    );
+    // Log primeras filas del primer chunk fresco para verificar estructura
+    if (fromApi && allRows.length === 0 && rows.length > 0) {
+      console.log(`[Thinkion/${empresaId}] R234 muestra:`, JSON.stringify(rows[0]));
+    }
+    allRows.push(...rows);
+    if (fromApi) await sleep(800);
+  }
+
+  console.log(`[Thinkion/${empresaId}] Total ventas diarias (R234): ${allRows.length} filas`);
+
+  const records = [];
+  for (const row of allRows) {
+    // date_init puede ser "DD.MM.YYYY HH:MM" o "DD.MM.YYYY" — parseamos ambos
+    const parsed = parseDatetime(row.date_init) || parseDating(row.date_init) || parseDating(row.dating);
+    if (!parsed) continue;
+    const { year, month1, day } = parsed;
+
+    const venta = parseFloat(row.total || row.sale || row.amount || '0') || 0;
+    if (!venta) continue;
+
+    const fecha     = `${year}-${String(month1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const mesNombre = MES_NOMBRES[month1 - 1] || 'ENERO';
+
+    records.push({
+      fecha,
+      año:        year,
+      mes:        month1,
+      mesNombre,
+      venta,
+      orden:      1,
+      tipoTicket: (row.ticket_last || row.ticket_type || row.tipo_ticket || row.type || '').toUpperCase(),
+    });
+  }
+
+  return records;
+}
+
 // ── Movimientos de Stock (Report 283) ─────────────────────────────────────────
 async function fetchMovimientosStock(empresaId, monthsBack = 3) {
   const cfg = THINKION_CONFIG[empresaId];
@@ -531,6 +592,7 @@ async function reporteProductosSinCategoria(empresaId) {
 module.exports = {
   fetchCartaDataThinkion,
   fetchVentasHorariosThinkion,
+  fetchVentasDiariasThinkion,
   fetchMovimientosStock,
   reporteProductosSinCategoria,
   THINKION_CONFIG,

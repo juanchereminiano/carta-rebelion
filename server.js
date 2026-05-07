@@ -25,6 +25,7 @@ const { fetchVentasHorarios } = require('./src/ventasHorariosSheets');
 const {
   fetchCartaDataThinkion,
   fetchVentasHorariosThinkion,
+  fetchVentasDiariasThinkion,
   fetchMovimientosStock,
   reporteProductosSinCategoria,
   THINKION_CONFIG,
@@ -47,9 +48,10 @@ const app        = express();
 // TTL por defecto: 4 horas. El warmup + refresh proactivo garantizan que NodeCache
 // siempre tenga datos sin que el usuario espere la carga desde disco.
 const CACHE_TTL  = parseInt(process.env.CACHE_TTL) || 4 * 3600;
-const cache      = new NodeCache({ stdTTL: CACHE_TTL });
-const ipcCache   = new NodeCache({ stdTTL: 12 * 3600 }); // IPC INDEC: cache 12 h
-const turnosCache = new NodeCache({ stdTTL: CACHE_TTL });
+const cache        = new NodeCache({ stdTTL: CACHE_TTL });
+const ipcCache     = new NodeCache({ stdTTL: 12 * 3600 }); // IPC INDEC: cache 12 h
+const turnosCache  = new NodeCache({ stdTTL: CACHE_TTL });
+const ventasCache  = new NodeCache({ stdTTL: CACHE_TTL }); // R234 ventas por día de negocio
 
 // ── Configuración de proxy (Railway usa HTTPS terminado en proxy) ────────────
 app.set('trust proxy', 1);
@@ -345,6 +347,24 @@ async function getTurnosData(empresaId = 'rebelion') {
   return data;
 }
 
+// R234: ventas por día de negocio (fecha corregida para turnos de madrugada)
+async function getVentasDiariasData(empresaId = 'rebelion') {
+  const key = `ventas_${empresaId}`;
+  const cached = ventasCache.get(key);
+  if (cached) return cached;
+
+  let data;
+  if (THINKION_EMPRESAS.has(empresaId)) {
+    data = await fetchVentasDiariasThinkion(empresaId);
+  } else {
+    // Fallback: usar R233 para empresas sin Thinkion
+    data = await getTurnosData(empresaId);
+  }
+
+  ventasCache.set(key, data);
+  return data;
+}
+
 // Turnos & Horarios
 app.get('/api/turnos', async (req, res) => {
   try {
@@ -587,11 +607,13 @@ app.get('/api/ipc', async (req, res) => {
   }
 });
 
-// ── Ventas reales (R233): órdenes, importe, facturación, tabla año×mes ────────
+// ── Ventas por día de negocio (R234): KPIs, tabla año×mes, evolución ──────────
+// Usa R234 (no R233) para que ventas de madrugada se atribuyan al día de negocio correcto.
+// R233 sigue usándose solo en /api/turnos para el análisis horario exacto.
 app.get('/api/ventas', async (req, res) => {
   try {
     const empresaId = req.session?.empresa || 'rebelion';
-    const allRecords = await getTurnosData(empresaId);
+    const allRecords = await getVentasDiariasData(empresaId);   // R234
 
     const parse = key => req.query[key] ? req.query[key].split(',').map(s => s.trim()) : ['all'];
     const anos  = parse('anos');
@@ -613,9 +635,11 @@ app.post('/api/refresh', (req, res) => {
     // Limpia solo las keys de la empresa activa
     cache.del(`carta_${empresaId}`);
     turnosCache.del(`turnos_${empresaId}`);
+    ventasCache.del(`ventas_${empresaId}`);
   } else {
     cache.flushAll();
     turnosCache.flushAll();
+    ventasCache.flushAll();
   }
   ipcCache.flushAll();     // IPC siempre se limpia (es global)
   res.json({ ok: true });
@@ -683,11 +707,19 @@ async function warmupCaches() {
     }
 
     try {
-      console.log(`[Warmup] Turnos ${empresaId}…`);
-      await getTurnosData(empresaId);    // ← llena NodeCache "turnos_X"
+      console.log(`[Warmup] Turnos/horarios ${empresaId} (R233)…`);
+      await getTurnosData(empresaId);       // ← llena NodeCache "turnos_X"
       console.log(`[Warmup] Turnos ${empresaId} OK`);
     } catch (err) {
       console.warn(`[Warmup] Error turnos ${empresaId}:`, err.message);
+    }
+
+    try {
+      console.log(`[Warmup] Ventas diarias ${empresaId} (R234)…`);
+      await getVentasDiariasData(empresaId); // ← llena NodeCache "ventas_X"
+      console.log(`[Warmup] Ventas diarias ${empresaId} OK`);
+    } catch (err) {
+      console.warn(`[Warmup] Error ventas diarias ${empresaId}:`, err.message);
     }
   }
 
@@ -707,8 +739,10 @@ async function refreshCaches() {
     try {
       cache.del(`carta_${empresaId}`);
       turnosCache.del(`turnos_${empresaId}`);
+      ventasCache.del(`ventas_${empresaId}`);
       await getData(empresaId);
       await getTurnosData(empresaId);
+      await getVentasDiariasData(empresaId);
       console.log(`[Refresh] ${empresaId} OK`);
     } catch (err) {
       console.warn(`[Refresh] Error ${empresaId}:`, err.message);
