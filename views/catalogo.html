@@ -151,7 +151,7 @@
       overflow: hidden;
     }
 
-    table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    table { width: 100%; border-collapse: collapse; font-size: .82rem; min-width: 680px; }
     thead { background: #f8fafc; }
     th {
       padding: 10px 14px;
@@ -304,6 +304,26 @@
     .toggle-inp:checked + .toggle-label { background: #059669; }
     .toggle-inp:checked + .toggle-label::after { transform: translateX(16px); }
     .toggle-inp.dirty + .toggle-label { outline: 2px solid #fbbf24; border-radius: 20px; }
+
+    /* ── Responsive ──────────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .content { padding: 16px; }
+      .topbar  { padding: 12px 16px; flex-wrap: wrap; gap: 10px; }
+      .topbar h1 { font-size: .9rem; }
+      .topbar-right { flex-wrap: wrap; gap: 8px; }
+      /* tabla: scroll horizontal */
+      .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      /* toolbar: search ocupa todo el ancho */
+      .search-box { max-width: 100%; width: 100%; }
+      .toolbar { gap: 8px; }
+      /* pending bar */
+      .pending-bar { flex-wrap: wrap; gap: 8px; padding: 10px 14px; }
+    }
+    @media (max-width: 480px) {
+      .topbar-right .btn { display: none; } /* ocultar btn menos crítico si los hay */
+      .filter-select { font-size: .78rem; }
+    }
   </style>
 </head>
 <body>

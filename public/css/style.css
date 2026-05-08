@@ -256,6 +256,9 @@ body {
 .refresh-status.ok   { color: #28a67e; }
 .refresh-status.live { color: var(--accent); font-weight: 600; }
 
+/* ── Botón de filtros — solo visible en mobile/tablet ───────────────────── */
+.btn-filter-toggle { display: none; }
+
 /* ── User menu ───────────────────────────────────────────────────────────── */
 .user-menu { position: relative; }
 
@@ -1541,17 +1544,49 @@ body {
 
   /* ── ABC legend ── */
   .abc-legend { font-size: 0.7rem; gap: 5px; }
+
+  /* ── Seguimiento: chips de categoría + botones ── */
+  .seg-cat-header { flex-wrap: wrap; gap: 6px; }
+
+  /* ── Turnos: header "Promedio por hora" — metric toggle + leyenda ── */
+  .tur-legend { flex-wrap: wrap; }
+
+  /* ── Inflación: notas y tags en header ── */
+  .inf-method-note { font-size: 0.65rem; }
+
+  /* ── Tabla de items: buscador y selects en card-header ── */
+  #items-table-wrap .card-header-row > div { flex-wrap: wrap; width: 100%; }
+  .search-input { width: 100%; }
+
+  /* ── Turnos weekday table: ocultar % semana en tablet ── */
+  #tur-weekday-table th:nth-child(4),
+  #tur-weekday-table td:nth-child(4) { display: none; }
 }
 
 /* ── Móvil chico (< 480px) ────────────────────────────────────────────────── */
 @media (max-width: 480px) {
   .summary-grid     { grid-template-columns: 1fr; }
   .abc-summary-grid { grid-template-columns: 1fr; }
-  .topbar { padding: 0 10px; gap: 8px; }
-  .section-title { font-size: 0.9rem; }
+  .topbar { padding: 0 10px; gap: 6px; }
+  .section-title { font-size: 0.88rem; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .app-main { padding: 8px; gap: 8px; }
+
   /* Top tables en mobile: ocultar cant. */
   .top-table th:nth-child(5), .top-table td:nth-child(5) { display: none; }
+
+  /* ── Topbar: compactar menú de usuario — solo avatar ── */
+  .user-name, .user-role-badge, .user-caret { display: none; }
+  .user-menu-btn { padding: 0 5px; gap: 0; background: none; border-color: transparent; }
+
+  /* ── Imprimir: no tiene sentido en mobile ── */
+  .btn-print { display: none; }
+
+  /* ── Turnos weekday: ocultar más columnas en phone ── */
+  #tur-weekday-table th:nth-child(3),
+  #tur-weekday-table td:nth-child(3) { display: none; }
+
+  /* ── Seguimiento: stats grid más compacto ── */
+  .item-card-stats { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* ── Botón imprimir ──────────────────────────────────────────────────────── */
