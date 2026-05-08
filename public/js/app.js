@@ -89,6 +89,10 @@ function applyRoleUI(user) {
   const btnAdmin = document.getElementById('btn-admin-users');
   if (btnAdmin) btnAdmin.style.display = user.role === 'admin' ? '' : 'none';
 
+  // Link de Sistema en sidebar — solo para admins
+  const navSistema = document.getElementById('nav-sistema');
+  if (navSistema) navSistema.style.display = user.role === 'admin' ? '' : 'none';
+
   // Navegar a la primera sección disponible
   if (user.sections.length > 0) navigateTo(user.sections[0]);
 }
@@ -225,12 +229,11 @@ function initUserMenu() {
     document.getElementById('chpass-ok').style.display    = 'none';
   });
 
-  // Abrir modal admin usuarios
+  // Ir a Sistema (admin)
   const btnAdmin = document.getElementById('btn-admin-users');
   if (btnAdmin) btnAdmin.addEventListener('click', () => {
     dropdown.classList.remove('open');
-    openModal('modal-admin');
-    loadAdminUsers();
+    window.location.href = '/sistema';
   });
 }
 
