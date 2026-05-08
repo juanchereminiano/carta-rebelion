@@ -78,12 +78,16 @@ function findById(id) {
 
 function listUsers() {
   return users.map(u => ({
-    id: u.id, name: u.name, email: u.email, role: u.role,
+    id:     u.id,
+    name:   u.name,
+    email:  u.email,
+    role:   u.role,
+    locales: u.locales || [],   // [] = acceso a todos (sin restricción)
   }));
 }
 
 // ── Mutaciones ─────────────────────────────────────────────────────────────
-async function createUser(name, email, role, password) {
+async function createUser(name, email, role, password, locales = []) {
   if (!name || !email || !role || !password)
     return { error: 'Todos los campos son requeridos' };
   if (!VALID_ROLES.includes(role))
@@ -95,10 +99,40 @@ async function createUser(name, email, role, password) {
 
   const id           = String(Date.now());
   const passwordHash = await bcrypt.hash(password, 10);
-  const user         = { id, name, email: email.toLowerCase().trim(), passwordHash, role };
+  const user         = {
+    id, name,
+    email:         email.toLowerCase().trim(),
+    passwordHash,
+    role,
+    locales:       Array.isArray(locales) ? locales : [],
+  };
   users.push(user);
   saveUsers();
   return { ok: true, user: publicUser(user) };
+}
+
+/** Actualiza los locales permitidos de un usuario ([] = todos). */
+function updateUserLocales(id, locales) {
+  const user = findById(id);
+  if (!user) return false;
+  user.locales = Array.isArray(locales) ? locales : [];
+  saveUsers();
+  return true;
+}
+
+/** Actualiza nombre y/o email de un usuario. */
+function updateUserInfo(id, fields = {}) {
+  const user = findById(id);
+  if (!user) return { error: 'Usuario no encontrado' };
+  if (fields.name  !== undefined) user.name  = String(fields.name).trim();
+  if (fields.email !== undefined) {
+    const newEmail = String(fields.email).toLowerCase().trim();
+    const conflict = users.find(u => u.email === newEmail && u.id !== id);
+    if (conflict) return { error: 'Ya existe un usuario con ese email' };
+    user.email = newEmail;
+  }
+  saveUsers();
+  return { ok: true };
 }
 
 function deleteUser(id) {
@@ -146,12 +180,25 @@ function publicUser(user) {
     roleLabel:  ROLE_LABELS[user.role] || user.role,
     sections:   ROLE_SECTIONS[user.role] || [],
     canRefresh: ROLE_CAN_REFRESH[user.role] ?? false,
+    locales:    user.locales || [],   // [] = sin restricción
   };
+}
+
+/**
+ * Devuelve true si el usuario puede acceder a una empresa.
+ * Admins siempre pueden; otros respetan el array locales ([] = todos).
+ */
+function canAccessEmpresa(user, empresaId) {
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  const loc = user.locales || [];
+  return loc.length === 0 || loc.includes(empresaId);
 }
 
 module.exports = {
   findByEmail, findById, listUsers,
-  createUser, deleteUser, updateUserRole,
+  createUser, deleteUser, updateUserRole, updateUserLocales, updateUserInfo,
   verifyPassword, changePassword, hashPassword,
-  publicUser, VALID_ROLES, ROLE_LABELS,
+  publicUser, canAccessEmpresa,
+  VALID_ROLES, ROLE_LABELS,
 };

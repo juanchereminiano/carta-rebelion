@@ -32,6 +32,7 @@ const {
   THINKION_CONFIG,
 } = require('./src/thinkionAPI');
 const { readCatalog, updateProducts, buildProductList } = require('./src/productCatalog');
+const { updateUserLocales, updateUserInfo } = require('./src/auth');
 const {
   filterVentas,
   buildHourlyStats,
@@ -215,6 +216,10 @@ app.post('/api/empresa/select', (req, res) => {
     return res.status(400).json({ error: 'Empresa inválida' });
   if (!EMPRESAS[empresa].activa)
     return res.status(400).json({ error: 'Empresa no disponible aún' });
+  // Verificar que el usuario tiene acceso a este local
+  const user = auth.findById(req.session?.userId);
+  if (!auth.canAccessEmpresa(user, empresa))
+    return res.status(403).json({ error: 'No tenés acceso a este local' });
   req.session.empresa = empresa;
   res.json({ ok: true, empresa: EMPRESAS[empresa] });
 });
@@ -224,8 +229,19 @@ app.get('/api/empresa/current', (req, res) => {
   res.json(EMPRESAS[id] || EMPRESAS.rebelion);
 });
 
+// Devuelve solo los locales que el usuario puede ver
 app.get('/api/empresas', (req, res) => {
-  res.json(Object.values(EMPRESAS));
+  const user = auth.findById(req.session?.userId);
+  const all  = Object.values(EMPRESAS).filter(e => e.activa);
+  if (!user || user.role === 'admin') return res.json(all);
+  const loc = user.locales || [];
+  const visible = loc.length === 0 ? all : all.filter(e => loc.includes(e.id));
+  res.json(visible);
+});
+
+// Lista COMPLETA de empresas (solo admin, para el panel de sistema)
+app.get('/api/empresas/all', requireAdmin, (req, res) => {
+  res.json(Object.values(EMPRESAS).filter(e => e.activa));
 });
 
 // ── Guard: / redirige a /empresa si no hay empresa seleccionada en sesión ─────
@@ -281,8 +297,8 @@ app.post('/admin/reset-password', requireAdmin, async (req, res) => {
 });
 
 app.post('/admin/users', requireAdmin, async (req, res) => {
-  const { name, email, role, password } = req.body || {};
-  const result = await auth.createUser(name, email, role, password);
+  const { name, email, role, password, locales } = req.body || {};
+  const result = await auth.createUser(name, email, role, password, locales || []);
   if (result.error) return res.status(409).json({ error: result.error });
   res.json(result);
 });
@@ -304,6 +320,30 @@ app.patch('/admin/users/:id/role', requireAdmin, (req, res) => {
   const ok = auth.updateUserRole(id, role);
   if (!ok) return res.status(400).json({ error: 'Rol inválido o usuario no encontrado' });
   res.json({ ok: true });
+});
+
+// Actualizar locales permitidos de un usuario
+app.patch('/admin/users/:id/locales', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const { locales } = req.body || {};
+  if (!Array.isArray(locales)) return res.status(400).json({ error: 'locales debe ser un array' });
+  const ok = updateUserLocales(id, locales);
+  if (!ok) return res.status(404).json({ error: 'Usuario no encontrado' });
+  res.json({ ok: true });
+});
+
+// Actualizar nombre/email de un usuario
+app.patch('/admin/users/:id/info', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const { name, email } = req.body || {};
+  const result = updateUserInfo(id, { name, email });
+  if (result.error) return res.status(400).json(result);
+  res.json({ ok: true });
+});
+
+// Página de Sistema (solo admin)
+app.get('/sistema', requireAdmin, (req, res) => {
+  res.sendFile(path.join(__dirname, 'views', 'sistema.html'));
 });
 
 // ── Archivos estáticos (solo para usuarios autenticados) ──────────────────────

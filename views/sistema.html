@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sistema — Gestión de Usuarios</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: #f5f5f0;
+      color: #1e293b;
+      min-height: 100vh;
+    }
+
+    /* ── Layout ── */
+    .layout { display: flex; min-height: 100vh; }
+
+    .sidebar {
+      width: 220px;
+      background: #1e3a6e;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 0;
+      flex-shrink: 0;
+    }
+    .sidebar-logo {
+      padding: 0 20px 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      font-size: .75rem;
+      opacity: .6;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    .sidebar-section {
+      padding: 14px 20px 4px;
+      font-size: .65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: rgba(255,255,255,.35);
+    }
+    .sidebar-nav { padding: 8px 0; flex: 1; }
+    .sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px;
+      color: rgba(255,255,255,.65);
+      text-decoration: none;
+      font-size: .82rem;
+      font-weight: 500;
+      border-left: 3px solid transparent;
+      transition: background .15s, color .15s;
+    }
+    .sidebar-link:hover { background: rgba(255,255,255,.06); color: #fff; }
+    .sidebar-link.active {
+      background: rgba(255,255,255,.1);
+      color: #fff;
+      border-left-color: #60a5fa;
+    }
+
+    .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+    .topbar {
+      background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .topbar h1 { font-size: 1rem; font-weight: 700; color: #1e3a6e; }
+    .topbar-sub { font-size: .78rem; color: #64748b; margin-top: 2px; }
+
+    .content { padding: 28px; flex: 1; max-width: 1100px; }
+
+    /* ── Secciones ── */
+    .section-card {
+      background: #fff;
+      border-radius: 14px;
+      border: 1px solid #e2e8f0;
+      overflow: hidden;
+      margin-bottom: 28px;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .section-title {
+      font-size: .88rem;
+      font-weight: 700;
+      color: #1e3a6e;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-badge {
+      background: #eff6ff;
+      color: #2563eb;
+      border: 1px solid #bfdbfe;
+      border-radius: 20px;
+      padding: 2px 10px;
+      font-size: .72rem;
+      font-weight: 700;
+    }
+
+    /* ── Tabla de usuarios ── */
+    table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+    thead { background: #f8fafc; }
+    th {
+      padding: 10px 16px;
+      text-align: left;
+      font-size: .68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #64748b;
+      border-bottom: 1px solid #e2e8f0;
+      white-space: nowrap;
+    }
+    td {
+      padding: 10px 16px;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+
+    .col-user  { min-width: 200px; }
+    .col-role  { width: 130px; }
+    .col-loc   { min-width: 340px; }
+    .col-act   { width: 130px; text-align: right; }
+
+    .user-name  { font-weight: 600; color: #1e293b; }
+    .user-email { font-size: .75rem; color: #64748b; margin-top: 1px; }
+
+    .avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #1e3a6e;
+      color: #fff;
+      font-size: .78rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .user-cell { display: flex; align-items: center; gap: 10px; }
+
+    /* ── Role badge ── */
+    .role-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: .72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .role-admin    { background: #fee2e2; color: #b91c1c; }
+    .role-socio    { background: #ede9fe; color: #6d28d9; }
+    .role-gerencia { background: #dbeafe; color: #1d4ed8; }
+    .role-staff    { background: #f0fdf4; color: #15803d; }
+
+    /* ── Role select ── */
+    .role-select {
+      padding: 5px 8px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: .8rem;
+      font-family: inherit;
+      background: #fff;
+      cursor: pointer;
+      outline: none;
+      width: 120px;
+    }
+    .role-select:focus { border-color: #60a5fa; }
+
+    /* ── Locales chips ── */
+    .locales-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .loc-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: .72rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all .15s;
+      user-select: none;
+    }
+    .loc-chip.active {
+      color: #fff;
+      border-color: transparent;
+    }
+    .loc-chip.inactive {
+      background: #f1f5f9 !important;
+      color: #94a3b8 !important;
+      border-color: #e2e8f0;
+    }
+    .loc-chip .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: .7;
+    }
+    .loc-all-label {
+      font-size: .72rem;
+      color: #94a3b8;
+      font-style: italic;
+    }
+
+    /* ── Botones acción ── */
+    .btn {
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: .78rem;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: opacity .15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+    .btn:hover { opacity: .82; }
+    .btn:disabled { opacity: .35; cursor: default; }
+    .btn-primary  { background: #1e3a6e; color: #fff; }
+    .btn-success  { background: #059669; color: #fff; }
+    .btn-danger   { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+    .btn-ghost    { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+    .btn-sm       { padding: 4px 10px; font-size: .74rem; }
+
+    .actions-cell { display: flex; gap: 6px; justify-content: flex-end; }
+
+    /* ── Panel contraseña ── */
+    .pwd-panel {
+      display: none;
+      margin-top: 6px;
+    }
+    .pwd-panel.open { display: flex; gap: 6px; align-items: center; }
+    .pwd-input {
+      padding: 5px 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: .8rem;
+      outline: none;
+      width: 160px;
+    }
+    .pwd-input:focus { border-color: #60a5fa; }
+
+    /* ── Formulario nuevo usuario ── */
+    .add-form {
+      padding: 20px 24px;
+      border-top: 1px solid #f1f5f9;
+    }
+    .add-form h3 {
+      font-size: .8rem;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      margin-bottom: 14px;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 140px 160px;
+      gap: 10px;
+      align-items: end;
+      margin-bottom: 12px;
+    }
+    .form-group label {
+      display: block;
+      font-size: .72rem;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      margin-bottom: 5px;
+    }
+    .form-input, .form-select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: .83rem;
+      font-family: inherit;
+      background: #fff;
+      outline: none;
+    }
+    .form-input:focus, .form-select:focus { border-color: #60a5fa; }
+
+    .locales-new {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .locales-new-label {
+      width: 100%;
+      font-size: .72rem;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      margin-bottom: 2px;
+    }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: .85rem;
+      font-weight: 600;
+      color: #fff;
+      z-index: 9999;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity .25s, transform .25s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: none; }
+    .toast.ok  { background: #059669; }
+    .toast.err { background: #dc2626; }
+
+    /* ── Spinner ── */
+    .loading-state { text-align: center; padding: 48px 20px; color: #94a3b8; }
+    .spinner {
+      width: 28px; height: 28px;
+      border: 3px solid #e2e8f0;
+      border-top-color: #1e3a6e;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Confirm overlay ── */
+    .confirm-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.4);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+      opacity: 0; pointer-events: none;
+      transition: opacity .2s;
+    }
+    .confirm-overlay.show { opacity: 1; pointer-events: auto; }
+    .confirm-box {
+      background: #fff;
+      border-radius: 14px;
+      padding: 28px 32px;
+      max-width: 360px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,.2);
+    }
+    .confirm-box h3 { font-size: 1rem; margin-bottom: 10px; }
+    .confirm-box p  { font-size: .85rem; color: #64748b; margin-bottom: 20px; }
+    .confirm-btns   { display: flex; gap: 10px; justify-content: center; }
+  </style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo" id="sidebar-empresa">Sistema</div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section">Dashboard</div>
+      <a class="sidebar-link" href="/">📊 Carta</a>
+      <a class="sidebar-link" href="/catalogo">📦 Catálogo</a>
+      <div class="sidebar-section">Sistema</div>
+      <a class="sidebar-link active" href="/sistema">👥 Usuarios</a>
+      <a class="sidebar-link" href="/empresa">⇄ Cambiar local</a>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <h1>⚙️ Sistema — Gestión de Usuarios</h1>
+        <div class="topbar-sub">Solo visible para administradores</div>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- Tabla de usuarios -->
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-title">
+            👥 Usuarios
+            <span class="section-badge" id="user-count">—</span>
+          </div>
+        </div>
+
+        <div id="loading" class="loading-state">
+          <div class="spinner"></div>
+          Cargando usuarios…
+        </div>
+
+        <div id="table-wrap" style="display:none">
+          <table>
+            <thead>
+              <tr>
+                <th class="col-user">Usuario</th>
+                <th class="col-role">Rol</th>
+                <th class="col-loc">Locales con acceso</th>
+                <th class="col-act">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+
+        <!-- Formulario nuevo usuario -->
+        <div class="add-form">
+          <h3>➕ Nuevo usuario</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Nombre completo</label>
+              <input class="form-input" id="new-name" placeholder="Ej: Juan Pérez" />
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input class="form-input" id="new-email" type="email" placeholder="usuario@ejemplo.com" />
+            </div>
+            <div class="form-group">
+              <label>Rol</label>
+              <select class="form-select" id="new-role">
+                <option value="">— Elegir —</option>
+                <option value="admin">Admin</option>
+                <option value="socio">Socio</option>
+                <option value="gerencia">Gerencia</option>
+                <option value="staff">Staff</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Contraseña</label>
+              <input class="form-input" id="new-password" type="password" placeholder="Mín. 6 caracteres" />
+            </div>
+          </div>
+
+          <div class="locales-new">
+            <div class="locales-new-label">Locales con acceso <span style="font-weight:400;text-transform:none;color:#94a3b8">(vacío = todos)</span></div>
+            <div id="new-locales-chips"></div>
+          </div>
+
+          <button class="btn btn-primary" id="btn-create">Crear usuario</button>
+        </div>
+      </div>
+
+      <!-- Info roles -->
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-title">📋 Permisos por rol</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Rol</th>
+              <th>Carta / Dashboard</th>
+              <th>BCG</th>
+              <th>Inflación</th>
+              <th>Seguimiento</th>
+              <th>Turnos & Horarios</th>
+              <th>Actualizar datos</th>
+              <th>Sistema</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="role-badge role-admin">Admin</span></td>
+              <td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td>
+            </tr>
+            <tr>
+              <td><span class="role-badge role-socio">Socio</span></td>
+              <td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td>
+            </tr>
+            <tr>
+              <td><span class="role-badge role-gerencia">Gerencia</span></td>
+              <td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td>
+            </tr>
+            <tr>
+              <td><span class="role-badge role-staff">Staff</span></td>
+              <td>✅</td><td>—</td><td>—</td><td>✅</td><td>—</td><td>—</td><td>—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Confirm eliminar -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <h3>¿Eliminar usuario?</h3>
+    <p id="confirm-text">Esta acción no se puede deshacer.</p>
+    <div class="confirm-btns">
+      <button class="btn btn-ghost" id="confirm-cancel">Cancelar</button>
+      <button class="btn btn-danger" id="confirm-ok">Sí, eliminar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Estado ────────────────────────────────────────────────────────────────
+let allUsers    = [];
+let allEmpresas = [];
+let myId        = null;
+let confirmCb   = null;
+let newLocales  = new Set();  // para el form de nuevo usuario
+
+// Colores y nombres por empresa
+const EMP_META = {};
+
+// ── Init ──────────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const [meRes, usersRes, empRes] = await Promise.all([
+      fetch('/auth/me').then(r => r.json()),
+      fetch('/admin/users').then(r => r.json()),
+      fetch('/api/empresas/all').then(r => r.json()),
+    ]);
+
+    if (meRes.id) {
+      myId = meRes.id;
+      document.getElementById('sidebar-empresa').textContent = meRes.name || 'Sistema';
+    }
+
+    allEmpresas = empRes;
+    empRes.forEach(e => { EMP_META[e.id] = e; });
+
+    allUsers = usersRes;
+    document.getElementById('user-count').textContent = `${allUsers.length} usuarios`;
+
+    buildNewLocalesChips();
+    renderTable();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('table-wrap').style.display = 'block';
+  } catch (err) {
+    document.getElementById('loading').innerHTML =
+      `<p style="color:#dc2626">Error al cargar: ${err.message}</p>`;
+  }
+}
+
+// ── Render tabla ──────────────────────────────────────────────────────────
+function renderTable() {
+  document.getElementById('user-count').textContent = `${allUsers.length} usuarios`;
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = allUsers.map(u => renderRow(u)).join('');
+
+  // Eventos
+  tbody.querySelectorAll('[data-action]').forEach(el => {
+    el.addEventListener('click', onAction);
+  });
+  tbody.querySelectorAll('.role-select').forEach(sel => {
+    sel.addEventListener('change', onRoleChange);
+  });
+  tbody.querySelectorAll('.loc-chip[data-uid]').forEach(chip => {
+    chip.addEventListener('click', onLocaleToggle);
+  });
+  tbody.querySelectorAll('.pwd-btn').forEach(btn => {
+    btn.addEventListener('click', togglePwd);
+  });
+  tbody.querySelectorAll('.pwd-save').forEach(btn => {
+    btn.addEventListener('click', savePwd);
+  });
+}
+
+function initials(name) {
+  return (name || '?').split(' ').slice(0,2).map(p => p[0]?.toUpperCase() || '').join('');
+}
+
+function roleClass(role) {
+  const map = { admin: 'role-admin', socio: 'role-socio', gerencia: 'role-gerencia', staff: 'role-staff' };
+  return map[role] || '';
+}
+
+function renderRow(u) {
+  const isMe = String(u.id) === String(myId);
+  const locSet = new Set(u.locales || []);
+  const allAccess = locSet.size === 0;
+
+  const locChips = allEmpresas.map(e => {
+    const active = allAccess || locSet.has(e.id);
+    return `
+      <span class="loc-chip ${active ? 'active' : 'inactive'}"
+            data-uid="${u.id}" data-emp="${e.id}"
+            style="${active ? `background:${e.color};` : ''}"
+            title="${active ? 'Con acceso — clic para quitar' : 'Sin acceso — clic para dar acceso'}">
+        ${esc(e.nombre)}
+      </span>`;
+  }).join('');
+
+  const locLabel = allAccess
+    ? `<span class="loc-all-label">✓ Acceso a todos los locales</span>`
+    : '';
+
+  const pwdId = `pwd-${u.id}`;
+
+  return `
+    <tr data-uid="${u.id}">
+      <td class="col-user">
+        <div class="user-cell">
+          <div class="avatar">${initials(u.name)}</div>
+          <div>
+            <div class="user-name">${esc(u.name)}${isMe ? ' <span style="font-size:.7rem;color:#94a3b8">(vos)</span>' : ''}</div>
+            <div class="user-email">${esc(u.email)}</div>
+          </div>
+        </div>
+      </td>
+      <td class="col-role">
+        <select class="role-select" data-uid="${u.id}" ${isMe ? 'disabled title="No podés cambiar tu propio rol"' : ''}>
+          <option value="admin"    ${u.role==='admin'    ? 'selected':''}>Admin</option>
+          <option value="socio"    ${u.role==='socio'    ? 'selected':''}>Socio</option>
+          <option value="gerencia" ${u.role==='gerencia' ? 'selected':''}>Gerencia</option>
+          <option value="staff"    ${u.role==='staff'    ? 'selected':''}>Staff</option>
+        </select>
+      </td>
+      <td class="col-loc">
+        <div class="locales-row">
+          ${locChips}
+          ${locLabel}
+        </div>
+        <div style="margin-top:5px;font-size:.7rem;color:#94a3b8">
+          Clic en un local para dar/quitar acceso · Sin chips = acceso a todos
+        </div>
+      </td>
+      <td class="col-act">
+        <div class="actions-cell">
+          <button class="btn btn-ghost btn-sm pwd-btn" data-uid="${u.id}" data-target="${pwdId}">
+            🔑 Contraseña
+          </button>
+          ${!isMe ? `
+          <button class="btn btn-danger btn-sm" data-action="delete" data-uid="${u.id}" data-name="${esc(u.name)}">
+            🗑
+          </button>` : ''}
+        </div>
+        <div class="pwd-panel" id="${pwdId}">
+          <input class="pwd-input" type="password" placeholder="Nueva contraseña…"
+                 id="pwd-input-${u.id}" />
+          <button class="btn btn-success btn-sm pwd-save" data-uid="${u.id}">Guardar</button>
+          <button class="btn btn-ghost btn-sm pwd-cancel" data-target="${pwdId}" onclick="closePwd('${pwdId}')">✕</button>
+        </div>
+      </td>
+    </tr>`;
+}
+
+// ── Eventos ───────────────────────────────────────────────────────────────
+function togglePwd(e) {
+  const targetId = e.currentTarget.dataset.target;
+  const panel    = document.getElementById(targetId);
+  if (!panel) return;
+  const isOpen = panel.classList.contains('open');
+  // Cerrar todos los panels
+  document.querySelectorAll('.pwd-panel.open').forEach(p => p.classList.remove('open'));
+  if (!isOpen) panel.classList.add('open');
+}
+function closePwd(id) {
+  const panel = document.getElementById(id);
+  if (panel) panel.classList.remove('open');
+}
+
+async function savePwd(e) {
+  const uid   = e.currentTarget.dataset.uid;
+  const input = document.getElementById(`pwd-input-${uid}`);
+  const pwd   = input?.value?.trim();
+  if (!pwd || pwd.length < 6) { showToast('Mínimo 6 caracteres', 'err'); return; }
+
+  e.currentTarget.disabled = true;
+  try {
+    const res = await fetch('/admin/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: uid, newPassword: pwd }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    input.value = '';
+    closePwd(`pwd-${uid}`);
+    showToast('Contraseña actualizada ✓', 'ok');
+  } catch (err) {
+    showToast('Error: ' + err.message, 'err');
+  }
+  e.currentTarget.disabled = false;
+}
+
+async function onRoleChange(e) {
+  const uid  = e.target.dataset.uid;
+  const role = e.target.value;
+  try {
+    const res = await fetch(`/admin/users/${uid}/role`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    const u = allUsers.find(x => String(x.id) === String(uid));
+    if (u) u.role = role;
+    showToast('Rol actualizado ✓', 'ok');
+  } catch (err) {
+    showToast('Error: ' + err.message, 'err');
+    // Revertir
+    const u = allUsers.find(x => String(x.id) === String(uid));
+    if (u) e.target.value = u.role;
+  }
+}
+
+async function onLocaleToggle(e) {
+  const chip  = e.currentTarget;
+  const uid   = chip.dataset.uid;
+  const empId = chip.dataset.emp;
+  const u     = allUsers.find(x => String(x.id) === String(uid));
+  if (!u) return;
+
+  // Construir set actual de locales
+  const locSet = new Set(u.locales || []);
+
+  // Si es "acceso a todos" (vacío), expandir primero a todos los locales
+  if (locSet.size === 0) {
+    allEmpresas.forEach(e => locSet.add(e.id));
+  }
+
+  // Toggle del local clicado
+  if (locSet.has(empId)) {
+    locSet.delete(empId);
+  } else {
+    locSet.add(empId);
+  }
+
+  // Si quedan todos los locales, simplificar a [] (acceso total)
+  const newLoc = locSet.size === allEmpresas.length ? [] : [...locSet];
+
+  try {
+    const res = await fetch(`/admin/users/${uid}/locales`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locales: newLoc }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    u.locales = newLoc;
+
+    // Re-renderizar solo esa fila
+    const row = document.querySelector(`tr[data-uid="${uid}"]`);
+    if (row) {
+      const tmp = document.createElement('tbody');
+      tmp.innerHTML = renderRow(u);
+      const newRow = tmp.firstElementChild;
+      row.replaceWith(newRow);
+      // Re-vincular eventos de la nueva fila
+      newRow.querySelectorAll('[data-action]').forEach(el => el.addEventListener('click', onAction));
+      newRow.querySelectorAll('.role-select').forEach(sel => sel.addEventListener('change', onRoleChange));
+      newRow.querySelectorAll('.loc-chip[data-uid]').forEach(c => c.addEventListener('click', onLocaleToggle));
+      newRow.querySelectorAll('.pwd-btn').forEach(b => b.addEventListener('click', togglePwd));
+      newRow.querySelectorAll('.pwd-save').forEach(b => b.addEventListener('click', savePwd));
+    }
+
+    const label = newLoc.length === 0
+      ? 'Acceso a todos los locales'
+      : `Acceso a ${newLoc.length} local${newLoc.length !== 1 ? 'es' : ''}`;
+    showToast(label + ' ✓', 'ok');
+  } catch (err) {
+    showToast('Error: ' + err.message, 'err');
+  }
+}
+
+function onAction(e) {
+  const btn  = e.currentTarget;
+  const uid  = btn.dataset.uid;
+  const name = btn.dataset.name || 'este usuario';
+  const act  = btn.dataset.action;
+
+  if (act === 'delete') {
+    showConfirm(
+      `¿Eliminar a ${name}?`,
+      'Esta acción no se puede deshacer. El usuario perderá el acceso inmediatamente.',
+      async () => {
+        try {
+          const res = await fetch(`/admin/users/${uid}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error);
+          allUsers = allUsers.filter(u => String(u.id) !== String(uid));
+          renderTable();
+          showToast('Usuario eliminado', 'ok');
+        } catch (err) {
+          showToast('Error: ' + err.message, 'err');
+        }
+      }
+    );
+  }
+}
+
+// ── Nuevo usuario ─────────────────────────────────────────────────────────
+function buildNewLocalesChips() {
+  const wrap = document.getElementById('new-locales-chips');
+  wrap.innerHTML = allEmpresas.map(e => `
+    <span class="loc-chip inactive" data-new-emp="${e.id}"
+          style="cursor:pointer"
+          onclick="toggleNewLocale(this, '${e.id}', '${e.color}')">
+      ${esc(e.nombre)}
+    </span>`).join('');
+}
+
+function toggleNewLocale(chip, empId, color) {
+  if (newLocales.has(empId)) {
+    newLocales.delete(empId);
+    chip.classList.remove('active');
+    chip.classList.add('inactive');
+    chip.style.background = '';
+    chip.style.color = '';
+  } else {
+    newLocales.add(empId);
+    chip.classList.remove('inactive');
+    chip.classList.add('active');
+    chip.style.background = color;
+    chip.style.color = '#fff';
+  }
+}
+
+document.getElementById('btn-create').addEventListener('click', async () => {
+  const name     = document.getElementById('new-name').value.trim();
+  const email    = document.getElementById('new-email').value.trim();
+  const role     = document.getElementById('new-role').value;
+  const password = document.getElementById('new-password').value;
+  const locales  = [...newLocales];
+
+  if (!name || !email || !role || !password) {
+    showToast('Completá todos los campos obligatorios', 'err');
+    return;
+  }
+
+  const btn = document.getElementById('btn-create');
+  btn.disabled = true;
+  try {
+    const res = await fetch('/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, role, password, locales }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    allUsers.push({
+      id:      data.user.id,
+      name:    data.user.name,
+      email:   data.user.email,
+      role:    data.user.role,
+      locales: data.user.locales || [],
+    });
+    renderTable();
+
+    // Limpiar form
+    ['new-name','new-email','new-password'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('new-role').value = '';
+    newLocales.clear();
+    buildNewLocalesChips();
+
+    showToast(`Usuario ${name} creado ✓`, 'ok');
+  } catch (err) {
+    showToast('Error: ' + err.message, 'err');
+  }
+  btn.disabled = false;
+});
+
+// ── Confirm dialog ────────────────────────────────────────────────────────
+function showConfirm(title, text, cb) {
+  document.querySelector('.confirm-box h3').textContent = title;
+  document.getElementById('confirm-text').textContent   = text;
+  confirmCb = cb;
+  document.getElementById('confirm-overlay').classList.add('show');
+}
+document.getElementById('confirm-cancel').addEventListener('click', () => {
+  document.getElementById('confirm-overlay').classList.remove('show');
+  confirmCb = null;
+});
+document.getElementById('confirm-ok').addEventListener('click', async () => {
+  document.getElementById('confirm-overlay').classList.remove('show');
+  if (confirmCb) { await confirmCb(); confirmCb = null; }
+});
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+init();
+</script>
+</body>
+</html>
