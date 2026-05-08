@@ -533,6 +533,17 @@ let vtabMetric = 'ventas';  // métrica activa en tabla año×mes
 // Catálogo completo (años, meses, cats, productos)
 let catalog = { anos: [], meses: [], categorias: [], productos: [] };
 
+// Cache de turnos en cliente: evitar re-fetch al volver a la sección
+let _turnosCachedAt = 0;
+const TURNOS_CLIENT_TTL = 30 * 60 * 1000; // 30 min en cliente
+
+// Debounce: evitar múltiples requests cuando el usuario cambia filtros rápidamente
+let _loadDataTimer = null;
+function debouncedLoadData(ms = 350) {
+  clearTimeout(_loadDataTimer);
+  _loadDataTimer = setTimeout(() => loadData(), ms);
+}
+
 // ── Seguimiento ────────────────────────────────────────────────────────────
 const SEG_KEY = 'carta_seguimiento_v1';
 let segList = JSON.parse(localStorage.getItem(SEG_KEY) || '[]'); // array de nombres
@@ -789,7 +800,9 @@ function showToast(msg, duration = 3000) {
 let _autoRefresh   = null;   // interval del auto-refresh
 let _nextRefreshAt = null;   // Date de la próxima actualización automática
 
-const AUTO_REFRESH_MS = 10 * 60 * 1000;  // 10 minutos
+// Auto-refresh cada 60 min: el servidor refresca cada 3h desde Thinkion.
+// Refrescar el cliente más seguido no aporta datos nuevos y hace la app lenta.
+const AUTO_REFRESH_MS = 60 * 60 * 1000;  // 60 minutos
 
 function _fmtTime(date) {
   if (!date) return '';
@@ -875,12 +888,12 @@ function initFilters() {
   msAno = new MultiSelect({
     container: document.getElementById('ms-ano'),
     label: 'Año',
-    onChange: vals => { state.anos = vals; updateFilterBadge(); loadData(); },
+    onChange: vals => { state.anos = vals; updateFilterBadge(); debouncedLoadData(); },
   });
   msMes = new MultiSelect({
     container: document.getElementById('ms-mes'),
     label: 'Mes',
-    onChange: vals => { state.meses = vals; updateFilterBadge(); loadData(); },
+    onChange: vals => { state.meses = vals; updateFilterBadge(); debouncedLoadData(); },
   });
   msCat = new MultiSelect({
     container: document.getElementById('ms-cat'),
@@ -890,19 +903,19 @@ function initFilters() {
       state.categorias = vals;
       _refreshProductOptions();
       updateFilterBadge();
-      loadData();
+      debouncedLoadData();
     },
   });
   msProd = new MultiSelect({
     container: document.getElementById('ms-prod'),
     label: 'Producto',
     searchable: true,
-    onChange: vals => { state.productos = vals; updateFilterBadge(); loadData(); },
+    onChange: vals => { state.productos = vals; updateFilterBadge(); debouncedLoadData(); },
   });
   msMix = new MultiSelect({
     container: document.getElementById('ms-mix'),
     label: 'Mix',
-    onChange: vals => { state.mixes = vals; updateFilterBadge(); loadData(); },
+    onChange: vals => { state.mixes = vals; updateFilterBadge(); debouncedLoadData(); },
   });
 }
 
@@ -947,7 +960,7 @@ function initFilterModeToggle() {
     if (isRango) applyRangoDefaults();
     syncConstraints();
     updateFilterBadge();
-    loadData();
+    debouncedLoadData();
   }
 
   btnPeriodo.addEventListener('click', () => { if (state.filterMode !== 'periodo') setMode('periodo'); });
@@ -955,26 +968,24 @@ function initFilterModeToggle() {
 
   inputDesde.addEventListener('change', () => {
     state.desde = inputDesde.value;
-    // Si desde > hasta, ajustar hasta
     if (state.hasta && state.desde > state.hasta) {
       state.hasta = state.desde;
       inputHasta.value = state.desde;
     }
     syncConstraints();
     updateFilterBadge();
-    loadData();
+    debouncedLoadData();
   });
 
   inputHasta.addEventListener('change', () => {
     state.hasta = inputHasta.value;
-    // Si hasta < desde, ajustar desde
     if (state.desde && state.hasta < state.desde) {
       state.desde = state.hasta;
       inputDesde.value = state.hasta;
     }
     syncConstraints();
     updateFilterBadge();
-    loadData();
+    debouncedLoadData();
   });
 
   btnClear.addEventListener('click', () => {
@@ -984,7 +995,7 @@ function initFilterModeToggle() {
     inputHasta.value = today;
     syncConstraints();
     updateFilterBadge();
-    loadData();
+    debouncedLoadData();
   });
 }
 
@@ -3150,6 +3161,7 @@ async function loadData({ forceFlush = false } = {}) {
   try {
     if (forceFlush) {
       await fetch('/api/refresh', { method: 'POST' });
+      _turnosCachedAt = 0; // forzar re-fetch de turnos también
     }
 
     const params = new URLSearchParams({ metric: state.metric });
@@ -3164,16 +3176,38 @@ async function loadData({ forceFlush = false } = {}) {
     if (!state.productos.includes('all'))  params.set('productos',  state.productos.join(','));
     if (!state.mixes.includes('all'))      params.set('mixes',      state.mixes.join(','));
 
-    const [data, vdata] = await Promise.all([
+    // Carga carta + ventas en paralelo; turnos en paralelo si no está cacheado
+    const turnosStale = Date.now() - _turnosCachedAt > TURNOS_CLIENT_TTL;
+    const promises = [
       fetch(`/api/carta?${params}`).then(r => r.json()),
       fetch(`/api/ventas?${params}`).then(r => r.json()),
-    ]);
+      turnosStale && !turCatalog ? fetch('/api/turnos').then(r => r.json()) : Promise.resolve(null),
+    ];
+
+    const [data, vdata, tdata] = await Promise.all(promises);
     if (data.error) throw new Error(data.error);
+
     ventasData = vdata;
     renderAll(data);
     renderVentasKPIs(vdata);
     renderVentasEvolucion(vdata);
     renderVentasTabla(vdata, vtabMetric);
+
+    // Si turnos vino en paralelo, procesarlo en background (sin bloquear render)
+    if (tdata && !tdata.error) {
+      _turnosCachedAt = Date.now();
+      if (!turCatalog) {
+        turCatalog = tdata.catalog;
+        initTurnosCatalog(tdata.catalog);
+      }
+      _turLastData = tdata;
+      // Si el usuario ya está en la sección Turnos, renderizar de una
+      const turEl = document.getElementById('section-turnos');
+      if (turEl && turEl.classList.contains('active')) {
+        renderTurnosAll(_turLastData);
+      }
+    }
+
     setRefreshStatus('ok');
   } catch (err) {
     console.error(err);
@@ -3185,13 +3219,13 @@ async function loadData({ forceFlush = false } = {}) {
 }
 
 document.getElementById('btn-refresh').addEventListener('click', () => {
-  showToast('Forzando actualización desde Google Sheets…', 2000);
+  showToast('Actualizando datos…', 2000);
   loadData({ forceFlush: true });
 });
 
 // Cuando el usuario navega a Seguimiento, recargar si hay productos
 // Cuando navega a Inflación, cargar INDEC si aún no se cargó y re-renderizar
-// Cuando navega a Turnos, cargar datos si aún no se cargaron
+// Cuando navega a Turnos, mostrar desde caché si está disponible
 document.querySelectorAll('.nav-item').forEach(item => {
   if (item.dataset.section === 'seguimiento') {
     item.addEventListener('click', () => { if (segList.length > 0) loadSeguimiento(); }, { capture: true });
@@ -3207,7 +3241,12 @@ document.querySelectorAll('.nav-item').forEach(item => {
   }
   if (item.dataset.section === 'turnos') {
     item.addEventListener('click', () => {
-      if (!turCatalog) loadTurnosData();
+      if (_turLastData) {
+        // Ya tenemos datos en caché: renderizar instantáneamente
+        renderTurnosAll(_turLastData);
+      } else if (!turCatalog) {
+        loadTurnosData();
+      }
     }, { capture: true });
   }
 });
@@ -3232,6 +3271,16 @@ let turState = { anos:['all'], meses:['all'], dias:['all'], turno:'all' };
 let turCatalog = null;
 let turMsAno, turMsMes, turMsDia, turMsTurno;
 
+/** Renderiza todos los widgets de Turnos con datos ya disponibles (sin fetch). */
+function renderTurnosAll(data) {
+  renderSeasonKPIs(data.seasonStats);
+  renderTurnosKPIs(data.kpis);
+  renderWeekdayTable(data.weekdayStats, turHoraMetric);
+  renderHorlyChart(data.hourlyStats, turHoraMetric);
+  renderShiftEvolucion(data.shiftEvolucion);
+  renderHeatmap(data.heatmap);
+}
+
 async function loadTurnosData() {
   const params = new URLSearchParams();
   if (turState.anos[0]  !== 'all') params.set('anos',  turState.anos.join(','));
@@ -3251,12 +3300,8 @@ async function loadTurnosData() {
     }
 
     _turLastData = data;
-    renderSeasonKPIs(data.seasonStats);
-    renderTurnosKPIs(data.kpis);
-    renderWeekdayTable(data.weekdayStats, turHoraMetric);
-    renderHorlyChart(data.hourlyStats, turHoraMetric);
-    renderShiftEvolucion(data.shiftEvolucion);
-    renderHeatmap(data.heatmap);
+    _turnosCachedAt = Date.now();
+    renderTurnosAll(data);
   } catch (e) {
     console.error('Error loadTurnosData:', e);
   }

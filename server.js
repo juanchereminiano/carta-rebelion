@@ -50,10 +50,16 @@ const app        = express();
 // TTL por defecto: 4 horas. El warmup + refresh proactivo garantizan que NodeCache
 // siempre tenga datos sin que el usuario espere la carga desde disco.
 const CACHE_TTL  = parseInt(process.env.CACHE_TTL) || 4 * 3600;
-const cache        = new NodeCache({ stdTTL: CACHE_TTL });
-const ipcCache     = new NodeCache({ stdTTL: 12 * 3600 }); // IPC INDEC: cache 12 h
-const turnosCache  = new NodeCache({ stdTTL: CACHE_TTL });
-const ventasCache  = new NodeCache({ stdTTL: CACHE_TTL }); // R234 ventas por día de negocio
+const cache          = new NodeCache({ stdTTL: CACHE_TTL });
+const ipcCache       = new NodeCache({ stdTTL: 12 * 3600 }); // IPC INDEC: cache 12 h
+const turnosCache    = new NodeCache({ stdTTL: CACHE_TTL });
+const ventasCache    = new NodeCache({ stdTTL: CACHE_TTL }); // R233 ventas por día de negocio
+// Cache de transforms pesados independientes de filtros (inflacion, BCG, catalog, productList).
+// Evita recomputar en cada request de /api/carta y /api/turnos.
+// Se invalida cuando cambia el catálogo o se forza un refresh.
+const staticCache    = new NodeCache({ stdTTL: CACHE_TTL });
+// Cache de respuesta completa de /api/turnos (sin filtros).
+const turResCache    = new NodeCache({ stdTTL: CACHE_TTL });
 
 // ── Configuración de proxy (Railway usa HTTPS terminado en proxy) ────────────
 app.set('trust proxy', 1);
@@ -410,19 +416,26 @@ async function getVentasDiariasData(empresaId = 'rebelion') {
 app.get('/api/turnos', async (req, res) => {
   try {
     const empresaId  = req.session?.empresa || 'rebelion';
-    const allRecords = await getTurnosData(empresaId);
     const parse = key => req.query[key] ? req.query[key].split(',').map(s => s.trim()) : ['all'];
     const anos  = parse('anos');
     const meses = parse('meses');
     const dias  = parse('dias');
     const turno = req.query.turno || 'all';
 
+    // Sin filtros → cachear respuesta completa (la primera carga es la más costosa en transforms)
+    const hasFilters = anos[0] !== 'all' || meses[0] !== 'all' || dias[0] !== 'all' || turno !== 'all';
+    const turResCacheKey = `turres_${empresaId}`;
+    if (!hasFilters) {
+      const hit = turResCache.get(turResCacheKey);
+      if (hit) return res.json(hit);
+    }
+
+    const allRecords = await getTurnosData(empresaId);
     const filtered  = filterVentas(allRecords, { anos, meses, dias, turno });
-    // Estaciones: filtrar solo por año para tener visión completa de la temporada
     const byYear    = filterVentas(allRecords, { anos, meses: ['all'], dias: ['all'], turno: 'all' });
     const catalog   = buildCatalog(allRecords);
 
-    res.json({
+    const result = {
       kpis:           buildTurnosKPIs(filtered),
       hourlyStats:    buildHourlyStats(filtered),
       shiftEvolucion: buildShiftEvolucion(filtered),
@@ -430,12 +443,52 @@ app.get('/api/turnos', async (req, res) => {
       seasonStats:    buildSeasonStats(byYear),
       weekdayStats:   buildWeekdayStats(filtered),
       catalog,
-    });
+    };
+
+    if (!hasFilters) turResCache.set(turResCacheKey, result);
+    res.json(result);
   } catch (err) {
     console.error('Error /api/turnos:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
+
+/**
+ * getStaticTransforms: computa y cachea los datos independientes de filtros.
+ * BCG, Inflación y el Catálogo de dropdowns solo dependen del dataset completo
+ * de la empresa — no cambian con los filtros del usuario.
+ * Se cachea en staticCache (mismo TTL que los datos crudos).
+ * Se invalida cuando el catálogo se edita o se forza un refresh.
+ */
+async function getStaticTransforms(empresaId, records) {
+  const key = `static_${empresaId}`;
+  const hit  = staticCache.get(key);
+  if (hit) return hit;
+
+  const t0 = Date.now();
+
+  // buildProductList escanea disco — costoso, nunca debe ir en el path crítico
+  const productList       = buildProductList(empresaId);
+  const excludedInflacion = new Set(
+    productList.filter(p => p.excluirInflacion).map(p => p.nombreInforme)
+  );
+
+  const result = {
+    bcgData:      buildBCGData(records),
+    inflacion:    buildInflacion(records, excludedInflacion),
+    catalog: {
+      anos:       [...new Set(records.map(r => r.ano).filter(Boolean))].sort().map(String),
+      meses:      [...new Set(records.map(r => r.mes).filter(Boolean))],
+      categorias: [...new Set(records.map(r => r.categoria).filter(Boolean))].sort(),
+      mixes:      [...new Set(records.map(r => r.mix).filter(Boolean))].sort(),
+      productos:  buildTopItems(records, 9999).map(i => ({ producto: i.producto, categoria: i.categoria })),
+    },
+  };
+
+  staticCache.set(key, result);
+  console.log(`[StaticCache] ${empresaId}: listo en ${Date.now() - t0}ms`);
+  return result;
+}
 
 // Datos del tablero (con filtros opcionales)
 // Query params: ?anos=2024,2025  &meses=ENERO,FEBRERO  &categorias=C1,C2  &productos=P1  &metric=ventas|cantidad
@@ -456,26 +509,13 @@ app.get('/api/carta', async (req, res) => {
     const categorias = parse('categorias');
     const productos  = parse('productos');
     const mixes      = parse('mixes');
-    const desde      = req.query.desde || null;   // "YYYY-MM"
+    const desde      = req.query.desde || null;
     const hasta      = req.query.hasta || null;
 
     const filtered = filterRecords(records, { anos, meses, categorias, productos, mixes, desde, hasta });
 
-    // Catálogo completo (sin filtros) para los dropdowns del cliente
-    const allRecords = records;
-    const catalog = {
-      anos:       [...new Set(allRecords.map(r => r.ano).filter(Boolean))].sort().map(String),
-      meses:      [...new Set(allRecords.map(r => r.mes).filter(Boolean))],
-      categorias: [...new Set(allRecords.map(r => r.categoria).filter(Boolean))].sort(),
-      mixes:      [...new Set(allRecords.map(r => r.mix).filter(Boolean))].sort(),
-      productos:  buildTopItems(allRecords, 9999).map(i => ({ producto: i.producto, categoria: i.categoria })),
-    };
-
-    // Productos excluidos del análisis de inflación (campo excluirInflacion del catálogo)
-    const productList      = buildProductList(empresaId);
-    const excludedInflacion = new Set(
-      productList.filter(p => p.excluirInflacion).map(p => p.nombreInforme)
-    );
+    // Datos pesados sin filtros — desde caché (O(1) si ya calculado)
+    const { bcgData, inflacion, catalog } = await getStaticTransforms(empresaId, records);
 
     res.json({
       summary:      buildSummary(filtered),
@@ -483,8 +523,8 @@ app.get('/api/carta', async (req, res) => {
       categorias:   buildCategories(filtered, metric),
       evolucion:    buildEvolucion(filtered),
       topItems:     buildTopItems(filtered, 30),
-      bcgData:      buildBCGData(records),
-      inflacion:    buildInflacion(records, excludedInflacion),   // sin filtros de período; respeta exclusiones del catálogo
+      bcgData,
+      inflacion,
       mix:          buildMix(filtered, metric),
       mixEvolucion: buildMixEvolucion(filtered),
       catalog,
@@ -619,8 +659,10 @@ app.post('/api/catalogo', (req, res) => {
     if (!Array.isArray(updates) || !updates.length)
       return res.status(400).json({ error: 'Se esperan updates[]' });
     updateProducts(empresaId, updates);
-    // Limpiar caché del dashboard para que tome los nuevos nombres/categorías
+    // Limpiar toda la cadena de caché para que tome los nuevos nombres/categorías/exclusiones
     cache.del(`carta_${empresaId}`);
+    staticCache.del(`static_${empresaId}`);
+    turResCache.del(`turres_${empresaId}`);
     res.json({ ok: true });
   } catch (err) {
     console.error('Error POST /api/catalogo:', err.message);
@@ -679,16 +721,19 @@ app.get('/api/ventas', async (req, res) => {
 app.post('/api/refresh', (req, res) => {
   const empresaId = req.session?.empresa;
   if (empresaId) {
-    // Limpia solo las keys de la empresa activa
     cache.del(`carta_${empresaId}`);
     turnosCache.del(`turnos_${empresaId}`);
     ventasCache.del(`ventas_${empresaId}`);
+    staticCache.del(`static_${empresaId}`);
+    turResCache.del(`turres_${empresaId}`);
   } else {
     cache.flushAll();
     turnosCache.flushAll();
     ventasCache.flushAll();
+    staticCache.flushAll();
+    turResCache.flushAll();
   }
-  ipcCache.flushAll();     // IPC siempre se limpia (es global)
+  ipcCache.flushAll();
   res.json({ ok: true });
 });
 
@@ -741,34 +786,37 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
  */
 async function warmupCaches() {
   const empresas = [...THINKION_EMPRESAS];
-  console.log(`[Warmup] Pre-carga memoria+disco para: ${empresas.join(', ')}`);
+  console.log(`[Warmup] Pre-carga para: ${empresas.join(', ')}`);
   const t0 = Date.now();
 
-  for (const empresaId of empresas) {
+  // Cada empresa en paralelo — tokens distintos = sin conflicto de rate limit entre ellas
+  await Promise.all(empresas.map(async empresaId => {
     try {
-      console.log(`[Warmup] Carta ${empresaId}…`);
-      await getData(empresaId);          // ← llena NodeCache "carta_X"
-      console.log(`[Warmup] Carta ${empresaId} OK`);
-    } catch (err) {
-      console.warn(`[Warmup] Error carta ${empresaId}:`, err.message);
-    }
+      console.log(`[Warmup] ${empresaId}: carta…`);
+      await getData(empresaId);           // NodeCache "carta_X"
+      console.log(`[Warmup] ${empresaId}: carta OK`);
+    } catch (err) { console.warn(`[Warmup] ${empresaId} carta:`, err.message); }
 
     try {
-      console.log(`[Warmup] Turnos/horarios ${empresaId} (R233)…`);
-      await getTurnosData(empresaId);       // ← llena NodeCache "turnos_X"
-      console.log(`[Warmup] Turnos ${empresaId} OK`);
-    } catch (err) {
-      console.warn(`[Warmup] Error turnos ${empresaId}:`, err.message);
-    }
+      console.log(`[Warmup] ${empresaId}: turnos/horarios (R233)…`);
+      await getTurnosData(empresaId);     // NodeCache "turnos_X"
+      console.log(`[Warmup] ${empresaId}: turnos OK`);
+    } catch (err) { console.warn(`[Warmup] ${empresaId} turnos:`, err.message); }
 
     try {
-      console.log(`[Warmup] Ventas diarias ${empresaId} (R234)…`);
-      await getVentasDiariasData(empresaId); // ← llena NodeCache "ventas_X"
-      console.log(`[Warmup] Ventas diarias ${empresaId} OK`);
-    } catch (err) {
-      console.warn(`[Warmup] Error ventas diarias ${empresaId}:`, err.message);
-    }
-  }
+      console.log(`[Warmup] ${empresaId}: ventas diarias…`);
+      await getVentasDiariasData(empresaId); // NodeCache "ventas_X" (comparte disco con turnos)
+      console.log(`[Warmup] ${empresaId}: ventas OK`);
+    } catch (err) { console.warn(`[Warmup] ${empresaId} ventas:`, err.message); }
+
+    // Pre-calcular transforms pesados (inflacion, BCG, catalog) para que el primer
+    // request de /api/carta y /api/turnos sea instantáneo desde staticCache/turResCache
+    try {
+      const { records } = await getData(empresaId);
+      await getStaticTransforms(empresaId, records);
+      console.log(`[Warmup] ${empresaId}: static transforms OK`);
+    } catch (err) { console.warn(`[Warmup] ${empresaId} static:`, err.message); }
+  }));
 
   console.log(`[Warmup] Completo en ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 }
@@ -782,19 +830,25 @@ async function warmupCaches() {
 async function refreshCaches() {
   const empresas = [...THINKION_EMPRESAS];
   console.log('[Refresh] Actualizando caché en background…');
-  for (const empresaId of empresas) {
+  await Promise.all(empresas.map(async empresaId => {
     try {
+      // Invalidar todos los niveles de caché
       cache.del(`carta_${empresaId}`);
       turnosCache.del(`turnos_${empresaId}`);
       ventasCache.del(`ventas_${empresaId}`);
+      staticCache.del(`static_${empresaId}`);
+      turResCache.del(`turres_${empresaId}`);
+      // Re-llenar
       await getData(empresaId);
       await getTurnosData(empresaId);
       await getVentasDiariasData(empresaId);
+      const { records } = await getData(empresaId);
+      await getStaticTransforms(empresaId, records);
       console.log(`[Refresh] ${empresaId} OK`);
     } catch (err) {
       console.warn(`[Refresh] Error ${empresaId}:`, err.message);
     }
-  }
+  }));
   console.log('[Refresh] Completo.');
 }
 
