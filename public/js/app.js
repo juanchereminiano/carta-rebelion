@@ -1273,68 +1273,74 @@ function renderSummary(s) {
 }
 
 function renderPareto(pareto) {
-  const items   = pareto.items.slice(0, 20);
-  const labels  = items.map(i => i.producto.length > 18 ? i.producto.slice(0,16)+'…' : i.producto);
-  const valores = items.map(i => state.metric === 'cantidad' ? i.cantidad : i.ventas);
+  const items   = pareto.items.slice(0, 12);
   const isV     = state.metric === 'ventas';
+  const valores = items.map(i => isV ? i.ventas : i.cantidad);
+  const labels  = items.map(i => i.producto.length > 30 ? i.producto.slice(0,28)+'…' : i.producto);
 
-  // Colores por clase: A=verde esmeralda, B=dorado, C=azul apagado
-  const CLASE_BAR = { A: '#38d9a9', B: '#c8a84b', C: '#6e8faf' };
+  const CLASE_BAR = {
+    A: { bg: 'rgba(56,217,169,0.82)',  border: '#2bb891' },
+    B: { bg: 'rgba(200,168,75,0.82)',  border: '#b89535' },
+    C: { bg: 'rgba(110,143,175,0.75)', border: '#5a7fa8' },
+  };
 
-  upsertChart('chart-pareto', {
+  // Destruir siempre para poder recrear con el plugin inline
+  if (charts['chart-pareto']) { charts['chart-pareto'].destroy(); delete charts['chart-pareto']; }
+
+  charts['chart-pareto'] = new Chart(document.getElementById('chart-pareto').getContext('2d'), {
+    type: 'bar',
     data: {
       labels,
-      datasets: [
-        {
-          type: 'bar', label: isV ? 'Ventas $' : 'Cantidad',
-          data: valores,
-          backgroundColor: items.map(i => CLASE_BAR[i.clase] + 'dd'),
-          borderColor:     items.map(i => CLASE_BAR[i.clase]),
-          borderWidth: 0,
-          borderRadius: { topLeft: 5, topRight: 5 },
-          borderSkipped: 'bottom',
-          yAxisID: 'yBar', order: 2,
-        },
-        {
-          type: 'line', label: '% Acumulado',
-          data: items.map(i => i.pctCum),
-          borderColor: '#c8a84b',
-          backgroundColor: 'rgba(200,168,75,0.08)',
-          borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: '#c8a84b',
-          tension: 0.35, yAxisID: 'yLine', order: 1, fill: false,
-        },
-      ],
+      datasets: [{
+        label: isV ? 'Ventas $' : 'Cantidad',
+        data: valores,
+        backgroundColor: items.map(i => CLASE_BAR[i.clase]?.bg  || 'rgba(100,150,200,0.7)'),
+        borderColor:     items.map(i => CLASE_BAR[i.clase]?.border || '#6496c8'),
+        borderWidth: 0,
+        borderRadius: { topLeft: 0, topRight: 6, bottomLeft: 0, bottomRight: 6 },
+        borderSkipped: 'left',
+      }],
     },
     options: {
-      responsive: true, maintainAspectRatio: true, aspectRatio: 2.6,
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: true, aspectRatio: 1.5,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: CHART_DEFAULTS.legend(),
+        legend: { display: false },
         tooltip: {
           ...CHART_DEFAULTS.tooltip,
           callbacks: {
-            title: (ctx) => ctx[0]?.label || '',
-            label: ctx => ctx.dataset.yAxisID === 'yLine'
-              ? ` Acum: ${ctx.parsed.y.toFixed(1)}%`
-              : isV ? ` ${fmt.pesosFull(ctx.parsed.y)}` : ` ${fmt.num(ctx.parsed.y)} uds`,
+            title: ctx => {
+              const i = ctx[0].dataIndex;
+              return `#${i+1} ${items[i].producto}`;
+            },
+            label: ctx => {
+              const i   = ctx.dataIndex;
+              const val = isV ? fmt.pesosFull(ctx.parsed.x) : `${fmt.num(ctx.parsed.x)} uds`;
+              return ` ${val}  ·  ${items[i].pct}% del total`;
+            },
+            afterLabel: ctx => {
+              const i = ctx.dataIndex;
+              const cl = ctx.dataset.backgroundColor[i];
+              return ` Acumulado: ${(items[i].pctCum||0).toFixed(1)}%  ·  Clase ${items[i].clase}`;
+            },
           },
         },
       },
       scales: {
         x: {
-          ...CHART_DEFAULTS.scaleX,
-          ticks: { color: '#7a7060', maxRotation: 50, font: { size: 10 } },
-        },
-        yBar: {
-          ...CHART_DEFAULTS.scaleY,
-          position: 'left',
-          ticks: { color: '#7b7f94',
-            callback: v => isV ? '$'+(v>=1e6?(v/1e6).toFixed(1)+'M':(v>=1e3?(v/1e3).toFixed(0)+'k':v)) : fmt.num(v),
+          grid: { color: '#e8e3db' },
+          ticks: {
+            color: '#7b7f94',
+            callback: v => isV
+              ? '$'+(v>=1e9?(v/1e9).toFixed(1)+'B':v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(0)+'k':v)
+              : fmt.num(v),
+            font: { size: 10 },
           },
         },
-        yLine: {
-          position: 'right', grid: { drawOnChartArea: false }, min: 0, max: 100,
-          ticks: { color: '#c8a84b', callback: v => v+'%', font: { size: 10 } },
+        y: {
+          grid: { display: false },
+          ticks: { color: '#4a5568', font: { size: 11 }, maxRotation: 0 },
         },
       },
     },
@@ -1345,24 +1351,57 @@ function renderDonut(cats, canvasId = 'chart-donut', legendId = 'cat-legend') {
   const top    = cats.slice(0, 10);
   const isV    = state.metric === 'ventas';
   const colors = top.map((_, i) => CAT_PALETTE[i % CAT_PALETTE.length]);
+  const total  = top.reduce((s, c) => s + (isV ? c.ventas : c.cantidad), 0);
+  const totalLabel = isV ? fmt.pesosFull(total) : fmt.num(total);
+  const subLabel   = isV ? 'total' : 'unidades';
 
-  upsertChart(canvasId, {
+  // Destruir siempre para poder usar el plugin inline de texto central
+  if (charts[canvasId]) { charts[canvasId].destroy(); delete charts[canvasId]; }
+
+  charts[canvasId] = new Chart(document.getElementById(canvasId).getContext('2d'), {
     type: 'doughnut',
     data: {
       labels: top.map(c => c.nombre),
-      datasets: [{ data: top.map(c => isV ? c.ventas : c.cantidad),
-        backgroundColor: colors, borderWidth: 0, hoverOffset: 6 }],
+      datasets: [{
+        data: top.map(c => isV ? c.ventas : c.cantidad),
+        backgroundColor: colors,
+        borderWidth: 3,
+        borderColor: '#f4f1ec',
+        hoverOffset: 10,
+        hoverBorderWidth: 0,
+      }],
     },
     options: {
-      responsive: true, maintainAspectRatio: true, aspectRatio: 1.7, cutout: '62%',
+      responsive: true, maintainAspectRatio: true, aspectRatio: 1.7, cutout: '65%',
       plugins: {
         legend: { display: false },
         tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
-          label: ctx => { const pct = cats[ctx.dataIndex]?.pct||0;
-            return ` ${isV ? fmt.pesosFull(ctx.parsed) : fmt.num(ctx.parsed)}  (${pct}%)`; },
+          label: ctx => {
+            const c = top[ctx.dataIndex];
+            return ` ${isV ? fmt.pesosFull(ctx.parsed) : fmt.num(ctx.parsed)}  (${c.pct}%)`;
+          },
         }},
       },
     },
+    plugins: [{
+      id: 'centerLabel',
+      afterDraw(chart) {
+        const { ctx, chartArea } = chart;
+        if (!chartArea) return;
+        const cx = (chartArea.left + chartArea.right) / 2;
+        const cy = (chartArea.top  + chartArea.bottom) / 2;
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 13px system-ui,-apple-system,sans-serif';
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillText(totalLabel, cx, cy - 9);
+        ctx.font = '10px system-ui,-apple-system,sans-serif';
+        ctx.fillStyle = '#7a7060';
+        ctx.fillText(subLabel, cx, cy + 9);
+        ctx.restore();
+      },
+    }],
   });
 
   if (legendId) {

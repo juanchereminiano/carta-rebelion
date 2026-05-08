@@ -360,11 +360,25 @@ function buildVentasResumen(records, { desde, hasta, anos, meses } = {}) {
     evMap[key].ventas  += r.venta || 0;
     evMap[key].ordenes += 1;
   });
-  const evKeys = Object.keys(evMap).sort();
+  const evKeys = Object.keys(evMap).sort(); // solo meses con datos reales (para comparativas)
+
+  // Rellenar meses vacíos entre el primero y el último para mostrar gaps en el gráfico
+  const evMapFull = { ...evMap };
+  if (evKeys.length >= 2) {
+    let [cy, cm] = evKeys[0].split('-').map(Number);
+    const [ly, lm] = evKeys[evKeys.length - 1].split('-').map(Number);
+    while (cy < ly || (cy === ly && cm <= lm)) {
+      const k = `${cy}-${String(cm).padStart(2, '0')}`;
+      if (!evMapFull[k]) evMapFull[k] = { año: cy, mesNombre: MES_ORDER[cm - 1], ventas: 0, ordenes: 0 };
+      if (++cm > 12) { cm = 1; cy++; }
+    }
+  }
+  const evKeysFull = Object.keys(evMapFull).sort();
+
   const evolucion = {
-    labels:  evKeys.map(k => { const d = evMap[k]; return `${d.mesNombre.slice(0,3)} ${d.año}`; }),
-    ventas:  evKeys.map(k => evMap[k].ventas),
-    ordenes: evKeys.map(k => evMap[k].ordenes),
+    labels:  evKeysFull.map(k => { const d = evMapFull[k]; return `${d.mesNombre.slice(0,3)} ${d.año}`; }),
+    ventas:  evKeysFull.map(k => evMapFull[k].ventas),
+    ordenes: evKeysFull.map(k => evMapFull[k].ordenes),
   };
 
   // ── Comparativas del último mes disponible ────────────────────────────────
